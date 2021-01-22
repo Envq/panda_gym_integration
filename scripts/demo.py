@@ -8,7 +8,7 @@ if __name__ == '__main__':
   try:
     # Initialize moveit_commander and rospy
     moveit_commander.roscpp_initialize(sys.argv)
-    rospy.init_node('move_group_python_interface_tutorial', anonymous=True)
+    rospy.init_node('panda_moveit_interface_demo_node', anonymous=True)
 
     # Inizialize movegroupinterface
     panda = MoveGroupInterface()

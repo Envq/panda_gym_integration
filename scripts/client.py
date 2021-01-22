@@ -1,15 +1,9 @@
 #!/usr/bin/env python2
 
 from utils.joints_msg import createJointsMsg, getJointsMsg
+from utils.panda_interface import MoveGroupInterface
+import sys, rospy, moveit_commander
 import socket, sys
-
-
-def getCurrentJoints():
-    return (0, 0, 0, 0, 0, 0, 0)
-
-
-def moveJointsTo(goal_joints):
-    return
 
 
 def main():
@@ -31,10 +25,17 @@ def main():
     s.connect((HOST, PORT))
     print("TCP client connected to server {}:{}".format(HOST, PORT))
 
+    # Initialize moveit_commander and rospy
+    moveit_commander.roscpp_initialize(sys.argv)
+    rospy.init_node('panda_moveit_interface_node', anonymous=True)
+
+    # Create MoveGroupInterface
+    panda = MoveGroupInterface()
+
     # Listen for incoming message for User
     while(True):
         # Send current joints message
-        s.send(createJointsMsg(getCurrentJoints()))
+        s.send(createJointsMsg(panda.getJoints()))
 
         # Get server response
         goal_joints = getJointsMsg(s.recv(1024))
@@ -45,8 +46,8 @@ def main():
             break
 
         # Perform goal joints
-        moveJointsTo(goal_joints)
-        print("Goal Joints: ", goal_joints)
+        success = panda.moveToJoints(goal_joints)
+        print("Success: ", success)
     s.close()
 
 
