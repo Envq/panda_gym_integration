@@ -1,0 +1,4 @@
+<launch>
+  <node name="panda_interface_node" pkg="panda_gym_moveit" type="panda_interface.py" respawn="false" output="screen">
+  </node>
+</launch>

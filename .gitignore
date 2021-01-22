@@ -52,4 +52,4 @@ CATKIN_IGNORE
 
 
 **/__pycache__/
-src/
+example/

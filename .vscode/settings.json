@@ -1,7 +1,7 @@
 {
-    "python.pythonPath": "/usr/bin/python",
+    "python.pythonPath": "/usr/bin/python3",
     "python.analysis.extraPaths": [
-        "${workspaceFolder}/scripts", 
-        "${workspaceFolder}/src"
+        "${workspaceFolder}/scripts/",
+        "${workspaceFolder}/scripts/src/",
     ]
 }

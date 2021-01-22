@@ -1,8 +1,10 @@
 def createJointsMsg(joints):
     return str.encode(' '.join(map(str, joints)))
 
+
 def createCloseMsg():
     return str.encode('q')
+
 
 def getJointsMsg(msg):
     response = msg.decode()
@@ -16,6 +18,7 @@ def getJointsMsg(msg):
 
 
 if __name__ == '__main__':
+    """ TEST """
     joints_msg = createJointsMsg(('1', '1', '1', '1.5', '0', '0', '1'))
     print(joints_msg)
     print(getJointsMsg(joints_msg))
