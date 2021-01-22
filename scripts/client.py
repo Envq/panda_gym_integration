@@ -1,7 +1,15 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python2
 
-from utils.joints_msg import createCloseMsg, createJointsMsg, getJointsMsg
+from utils.joints_msg import createJointsMsg, getJointsMsg
 import socket, sys
+
+
+def getCurrentJoints():
+    return (0, 0, 0, 0, 0, 0, 0)
+
+
+def moveJointsTo(goal_joints):
+    return
 
 
 def main():
@@ -18,29 +26,28 @@ def main():
     print("Selected: -> {}:{}".format(HOST,PORT))
 
     # Create a TCP socket at client side
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        print("TCP client ready")
-        s.connect((HOST, PORT))
-        print("TCP client connected to server {}:{}".format(HOST, PORT))
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    print("TCP client ready")
+    s.connect((HOST, PORT))
+    print("TCP client connected to server {}:{}".format(HOST, PORT))
 
-        # Listen for incoming data from User
-        while(True):
-            # Check if close
-            close = input("Press q to close: ")
-            if close == 'q':
-                print("Client closed")
-                s.send(createCloseMsg())
-                break
+    # Listen for incoming message for User
+    while(True):
+        # Send current joints message
+        s.send(createJointsMsg(getCurrentJoints()))
 
-            # Send joints message
-            goal_joints = list()
-            for i in range(7):
-                goal_joints.append(input("Joint{}: ".format(i)))
-            s.send(createJointsMsg(goal_joints))
+        # Get server response
+        goal_joints = getJointsMsg(s.recv(1024))
 
-            # Get server response
-            current_joints = getJointsMsg(s.recv(1024))
-            print(current_joints)
+        # Check if close
+        if goal_joints == 'close':
+            print("Client closed")
+            break
+
+        # Perform goal joints
+        moveJointsTo(goal_joints)
+        print("Goal Joints: ", goal_joints)
+    s.close()
 
 
 
