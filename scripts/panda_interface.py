@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 
-from src.panda_client import panda_interface
+from src.panda_client import GymInterface
 import sys, rospy, moveit_commander
 
 
@@ -14,14 +14,26 @@ try:
     rospy.init_node('panda_interface', anonymous=True)
 
     # Launch panda interface
-    interface = panda_interface(HOST, PORT)
+    interface = GymInterface(HOST, PORT)
 
     while True:
+        # Send current joints
         interface.sendCurrentJoints()
-        response = interface.getResponse()
-        if response == 'close':
+
+        # Get goal joints
+        goal_joints = interface.getGoalJoints()
+        
+        # Check close
+        if goal_joints == 'close':
             break
-        print("Success? ", response)
+
+        # Run goal joints
+        success = interface.movePandaTo(goal_joints)
+        print("Success? ", success)
+        if not success:
+            print("Error! abort")
+            interface.sendError()
+            break
 
 except rospy.ROSInterruptException:
     print("ROS interrupted")

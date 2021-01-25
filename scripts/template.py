@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 
-from src.panda_server import gym_interface
+from src.panda_server import PandaInterface
 import gym, panda_gym
-import sys
 from math import pi
 
 
+
+def isFinish():
+    """RETURN IF TASK IS FINISHED"""
+    done = input("Done? [y/n]: ")
+    return done == 'y'
+
+
 def policy(current_joints):
-    """ POLICY DEFINITION """
+    """POLICY DEFINITION"""
     code = input("Insert Code: ")
     if code == '1':
         return (-1.688, -0.369, 2.081, -2.628, -2.341, 0.454, 0.323)
@@ -20,7 +26,7 @@ def policy(current_joints):
     
 
 def training():
-    """ GYM TRAINING """
+    """GYM TRAINING"""
     env = gym.make('PandaReach-v0', render=True)
 
     obs = env.reset()
@@ -33,23 +39,28 @@ def training():
 
 
 def testing():
-    """ GYM TESTING WITH REAL PANDA """
+    """GYM TESTING WITH REAL PANDA"""
     # Connection config
     HOST = "127.0.0.1"
     PORT = 2000
 
     # Create gym interface for connect to panda
-    interface = gym_interface(HOST, PORT)
+    interface = PandaInterface(HOST, PORT)
 
     while True:
         # Get current joints
         current_joints = interface.getCurrentJoints()
-        print("Current Joints: {}".format(current_joints))
 
-        # Check done task
-        done = input("Done? [y/n]: ")
-        if done == 'y':
-            interface.sendDone()
+        # Check error
+        if current_joints == 'error':
+            print("Panda Error!")
+            break
+        else:
+            print("Current Joints: {}".format(current_joints))
+
+        # Check close goal
+        if isFinish():
+            interface.sendClose()
             break
         
         # Process goal joints and execute them

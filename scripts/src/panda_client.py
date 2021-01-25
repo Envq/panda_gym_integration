@@ -1,13 +1,16 @@
 #!/usr/bin/env python2
 
-from .utils.joints_msg import createJointsMsg, getJointsMsg
+from .utils.joints_msg import createJointsMsg, createErrorMsg, processMsg
 from .utils.panda_moveit_interface import MoveGroupInterface
 import socket
 
 
-class panda_interface():
+
+class GymInterface():
+    """Interface to communicate with gym"""
+
     def __init__(self, HOST, PORT):
-        """ Open client socket and moveitInterface """
+        """Open client socket and moveitInterface"""
         # Print client info
         print("Selected: -> {}:{}".format(HOST, PORT))
 
@@ -27,25 +30,30 @@ class panda_interface():
     
 
     def sendCurrentJoints(self):
-        """ Send to client the current joints """
+        """Send to client the current joints"""
         msg = createJointsMsg(self.panda.getJoints())
         self.s.send(msg)
     
 
-    def getResponse(self):
-        """ Wait for message and process it """
-        goal_joints = getJointsMsg(self.s.recv(1024))
+    def sendError(self):
+        """Send to client the error message"""
+        msg = createErrorMsg()
+        self.s.send(msg)
+    
 
-        # Check if close
-        if goal_joints == 'close':
-            return goal_joints
+    def getGoalJoints(self):
+        """Wait for message and return goal joints from it or CLOSE"""
+        return processMsg(self.s.recv(1024))
 
-        # Perform goal joints and return status
+    
+    def movePandaTo(self, goal_joints):
+        """Perform goal joints and returns if the movement was successful"""
         return self.panda.moveToJoints(goal_joints)
 
 
 
 if __name__ == "__main__":
+    """TEST"""
     import sys, rospy, moveit_commander
 
     # Connection config
@@ -63,14 +71,26 @@ if __name__ == "__main__":
             PORT = int(sys.argv[2])
 
         # Create gym interface for connect to panda
-        interface = panda_interface(HOST, PORT)
+        interface = GymInterface(HOST, PORT)
 
         while True:
+            # Send current joints
             interface.sendCurrentJoints()
-            response = interface.getResponse()
-            if response == 'close':
+
+            # Get goal joints
+            goal_joints = interface.getGoalJoints()
+
+            # Check close
+            if goal_joints == 'close':
                 break
-            print("Success? ", response)
+
+            # Run goal joints
+            success = interface.movePandaTo(goal_joints)
+            print("Success? ", success)
+            if not success:
+                print("Error! abort")
+                interface.sendError()
+                break
 
     except rospy.ROSInterruptException:
         print("ROS interrupted")

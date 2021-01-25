@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 
-from .utils.joints_msg import createJointsMsg, createCloseMsg, getJointsMsg
+from .utils.joints_msg import createJointsMsg, createCloseMsg, processMsg
 from math import pi
 import socket
 
 
 
-class gym_interface():
+class PandaInterface():
+    """Interface to communicate with panda"""
+
     def __init__(self, HOST, PORT):
-        """ Open server socket and wait client """
+        """Open server socket and wait client"""
         print("Selected: -> {}:{}".format(HOST,PORT))
         
         # Create a TCP socket at server side
@@ -30,24 +32,23 @@ class gym_interface():
         
 
     def getCurrentJoints(self):
-        """ Wait for message and return current joints from it """
-        # Get joints message
-        msg = self.conn.recv(1024)
-        return getJointsMsg(msg)
+        """Wait for message and return current joints from it or ERROR"""
+        return processMsg(self.conn.recv(1024))
 
 
-    def sendDone(self):
-        """ Respond to client with closing message """
+    def sendClose(self):
+        """Respond to client with close message"""
         self.conn.send(createCloseMsg())
     
 
     def sendGoalJoints(self, goal_joints):
-        """ Create the goal joints and send them """
+        """Respond to client with goal joints"""
         self.conn.send(createJointsMsg(goal_joints))
 
 
 
 if __name__ == "__main__":
+    """TEST"""
     import sys
 
     # Connection config
@@ -60,21 +61,26 @@ if __name__ == "__main__":
         PORT = int(sys.argv[2])
 
     # Create gym interface for connect to panda
-    interface = gym_interface(HOST, PORT)
+    interface = PandaInterface(HOST, PORT)
 
     while True:
         # Get current joints
         current_joints = interface.getCurrentJoints()
-        print("Current Joints: {}".format(current_joints))
 
-        # Check done task
-        done = input("Done? [y/n]: ")
-        if done == 'y':
-            interface.sendDone()
+        # Check error
+        if current_joints == 'error':
+            print("Panda Error!")
+            break
+        else:
+            print("Current Joints: {}".format(current_joints))
+
+        # Check close goal
+        code = input("Insert Code [q to quit]: ")
+        if code == 'q':
+            interface.sendClose()
             break
         
-        # Process goal joints
-        code = input("Insert Code: ")
+        # Process goal joints            
         if code == '1':
             goal_joints = (-1.688, -0.369, 2.081, -2.628, -2.341, 0.454, 0.323)
         elif code == '2':

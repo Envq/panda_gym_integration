@@ -61,7 +61,7 @@ class MoveGroupInterface(object):
 
 
 if __name__ == '__main__':
-  """ TEST """
+  """TEST"""
   import sys, rospy
 
   try:

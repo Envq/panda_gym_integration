@@ -9,6 +9,7 @@ This package is useful for connect [panda_gym](https://github.com/qgallouedec/pa
 * [Nodes](#nodes)
   * [controller](#controller)
   * [simulation](#simulation)
+  * [panda_interface](#panda_interface)
 * [VSCode](#vscode)
 * [Author](#author)
 * [License](#license)
@@ -111,6 +112,16 @@ This node is for testing your scripts on your computer
 
 ### **controller**
 This node is for running your scripts on laboratory computer connect with Panda
+
+### **panda_interface**
+1. Use template to create your code.
+2. Run: python3 template
+3. Run: roslaunch panda_gym_moveit panda_simulation.launch
+
+
+![Sequence diagram Close](doc/images/sequence_close.png?raw=true "Sequence diagram Close")
+
+![Sequence diagram Error](doc/images/sequence_error.png?raw=true "Sequence diagram Error")
 
 
 ---
