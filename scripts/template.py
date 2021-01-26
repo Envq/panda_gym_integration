@@ -16,13 +16,13 @@ def policy(current_joints):
     """POLICY DEFINITION"""
     code = input("Insert Code: ")
     if code == '1':
-        return (-1.688, -0.369, 2.081, -2.628, -2.341, 0.454, 0.323)
+        return (-1.688, -0.369, 2.081, -2.628, -2.341, 0.454, 0.323, 0.0, 0.0)
     elif code == '2':
-        return (0.00, -0.25 * pi, 0.00, -0.75 * pi, 0.00, 0.50 * pi, 0.25 * pi)
+        return (0.00, -0.25 * pi, 0.00, -0.75 * pi, 0.00, 0.50 * pi, 0.25 * pi, 0.01, 0.01)
     elif code == '3':
-        return (0, -pi/4, 0, -pi/2, 0, pi/3, 0)
+        return (0, -pi/4, 0, -pi/2, 0, pi/3, 0, 0.0, 0.0)
     else:
-        return (0, 0, 0, 0, 0, 0, 0)
+        return (0, 0, 0, 0, 0, 0, 0, 0, 0)
     
 
 def training():
@@ -64,7 +64,10 @@ def testing():
             break
         
         # Process goal joints and execute them
-        interface.sendGoalJoints(policy(current_joints))
+        goal_joints = policy(current_joints)
+
+        # Perform them
+        interface.sendGoalJoints(goal_joints)
 
 
 

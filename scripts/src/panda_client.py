@@ -48,7 +48,7 @@ class GymInterface():
     
     def movePandaTo(self, goal_joints):
         """Perform goal joints and returns if the movement was successful"""
-        return self.panda.moveToJoints(goal_joints)
+        return self.panda.moveJointsTo(goal_joints)
 
 
 

@@ -52,4 +52,5 @@ CATKIN_IGNORE
 
 
 **/__pycache__/
+examples/
 example/

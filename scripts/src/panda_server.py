@@ -80,15 +80,15 @@ if __name__ == "__main__":
             interface.sendClose()
             break
         
-        # Process goal joints            
+        # Process goal joints
         if code == '1':
-            goal_joints = (-1.688, -0.369, 2.081, -2.628, -2.341, 0.454, 0.323)
+            goal_joints = (-1.688, -0.369, 2.081, -2.628, -2.341, 0.454, 0.323, 0.0, 0.0)
         elif code == '2':
-            goal_joints = (0.00, -0.25 * pi, 0.00, -0.75 * pi, 0.00, 0.50 * pi, 0.25 * pi)
+            goal_joints = (0.00, -0.25 * pi, 0.00, -0.75 * pi, 0.00, 0.50 * pi, 0.25 * pi, 0.01, 0.01)
         elif code == '3':
-            goal_joints = (0, -pi/4, 0, -pi/2, 0, pi/3, 0)
+            goal_joints = (0, -pi/4, 0, -pi/2, 0, pi/3, 0, 0.0, 0.0)
         else:
-            goal_joints = (0, 0, 0, 0, 0, 0, 0)
+            goal_joints = (0, 0, 0, 0, 0, 0, 0, 0, 0)
 
         # Send goal joints
         print("goal_joints: ", goal_joints)
