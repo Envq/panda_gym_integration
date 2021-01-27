@@ -29,16 +29,16 @@ class MoveGroupInterface(object):
 
 
   def getArmPose(self):
-    """[px, py, pz, ox, oy, oz, ow]"""
+    """[px, py, pz, ow, ox, oy, oz]"""
     pose = self.arm.get_current_pose().pose
     l = list()
     l.append(pose.position.x)
     l.append(pose.position.y)
     l.append(pose.position.z)
+    l.append(pose.orientation.w)
     l.append(pose.orientation.x)
     l.append(pose.orientation.y)
     l.append(pose.orientation.z)
-    l.append(pose.orientation.w)
     return l
 
 
@@ -48,7 +48,7 @@ class MoveGroupInterface(object):
   
 
   def getPose(self):
-    """[px, py, pz, ox, oy, oz, ow, gripper_size]"""
+    """[px, py, pz, ow, ox, oy, oz, gripper_size]"""
     return self.getArmPose() + [self.getHandJoints()[0]*2]
   
 
@@ -98,10 +98,10 @@ class MoveGroupInterface(object):
     target.position.x = goal_pose[0]
     target.position.y = goal_pose[1]
     target.position.z = goal_pose[2]
-    target.orientation.x = goal_pose[3]
-    target.orientation.y = goal_pose[4]
-    target.orientation.z = goal_pose[5]
-    target.orientation.w = goal_pose[6]
+    target.orientation.w = goal_pose[3]
+    target.orientation.x = goal_pose[4]
+    target.orientation.y = goal_pose[5]
+    target.orientation.z = goal_pose[6]
     try:
       self.arm.plan(target)
       self.arm.go(wait=True)
@@ -117,10 +117,10 @@ class MoveGroupInterface(object):
     target.position.x = goal_pose[0]
     target.position.y = goal_pose[1]
     target.position.z = goal_pose[2]
-    target.orientation.x = goal_pose[3]
-    target.orientation.y = goal_pose[4]
-    target.orientation.z = goal_pose[5]
-    target.orientation.w = goal_pose[6]
+    target.orientation.w = goal_pose[3]
+    target.orientation.x = goal_pose[4]
+    target.orientation.y = goal_pose[5]
+    target.orientation.z = goal_pose[6]
     gripper = [goal_pose[7]/2.0, goal_pose[7]/2.0]
     try:
       self.arm.plan(target)
