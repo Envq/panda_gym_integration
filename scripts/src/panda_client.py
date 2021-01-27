@@ -1,7 +1,6 @@
 #!/usr/bin/env python2
 
-from .utils.joints_msg import createJointsMsg, createErrorMsg, processMsg
-from .utils.panda_moveit_interface import MoveGroupInterface
+from .panda_msgs import createPandaMsg, processMsg, createErrorMsg
 import socket
 
 
@@ -19,19 +18,16 @@ class GymInterface():
         print("TCP client ready")
         self.s.connect((HOST, PORT))
         print("TCP client connected to server {}:{}".format(HOST, PORT))
-
-        # Create MoveGroupInterface
-        self.panda = MoveGroupInterface()
     
 
     def __del__(self):
         self.s.close()
         print("TCP Client closed")
-    
 
-    def sendCurrentJoints(self):
-        """Send to client the current joints"""
-        msg = createJointsMsg(self.panda.getJoints())
+
+    def sendCurrentState(self, current):
+        """Send to client the current joints/pose"""
+        msg = createPandaMsg(current)
         self.s.send(msg)
     
 
@@ -41,58 +37,48 @@ class GymInterface():
         self.s.send(msg)
     
 
-    def getGoalJoints(self):
-        """Wait for message and return goal joints from it or CLOSE"""
-        return processMsg(self.s.recv(1024))
+    def getGoalState(self):
+        """Wait for message and return goal joints/pose from it or CLOSE"""
+        goal = processMsg(self.s.recv(1024))
+        return goal
 
-    
-    def movePandaTo(self, goal_joints):
-        """Perform goal joints and returns if the movement was successful"""
-        return self.panda.moveJointsTo(goal_joints)
 
 
 
 if __name__ == "__main__":
     """TEST"""
-    import sys, rospy, moveit_commander
+    import sys
 
     # Connection config
     HOST = "127.0.0.1"
     PORT = 2000
 
-    try:
-        # Initialize moveit_commander and rospy
-        moveit_commander.roscpp_initialize(sys.argv)
-        rospy.init_node('panda_interface', anonymous=True)
+    # Update HOST and PORT
+    if (len(sys.argv) == 3):
+        HOST = sys.argv[1]
+        PORT = int(sys.argv[2])
 
-        # Update HOST and PORT
-        if (len(sys.argv) == 3):
-            HOST = sys.argv[1]
-            PORT = int(sys.argv[2])
+    # Create gym interface for connect to panda
+    interface = GymInterface(HOST, PORT)
 
-        # Create gym interface for connect to panda
-        interface = GymInterface(HOST, PORT)
 
-        while True:
-            # Send current joints
-            interface.sendCurrentJoints()
+    while True:
+        # get current joints/pose and send it
+        current = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        print("current: ", current)
+        interface.sendCurrentState(current)
 
-            # Get goal joints
-            goal_joints = interface.getGoalJoints()
+        # Wait for goal joints/pose and get it
+        goal = interface.getGoalState()
+        print("goal: ", goal)
 
-            # Check close
-            if goal_joints == 'close':
-                break
+        # Check close
+        if goal == 'close':
+            break
 
-            # Run goal joints
-            success = interface.movePandaTo(goal_joints)
-            print("Success? ", success)
-            if not success:
-                print("Error! abort")
-                interface.sendError()
-                break
-
-    except rospy.ROSInterruptException:
-        print("ROS interrupted")
-    except KeyboardInterrupt:
-        print("Keboard quit")
+        # Run goal joints/panda 
+        err = raw_input("Error? [y/n] ")
+        print(err)
+        if  err == 'y':
+            interface.sendError()
+            break

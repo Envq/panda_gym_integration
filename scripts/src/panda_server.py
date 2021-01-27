@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from .utils.joints_msg import createJointsMsg, createCloseMsg, processMsg
+from .panda_msgs import createPandaMsg, createCloseMsg, processMsg
 from math import pi
 import socket
 
@@ -31,19 +31,22 @@ class PandaInterface():
         print("TCP Server closed")
         
 
-    def getCurrentJoints(self):
-        """Wait for message and return current joints from it or ERROR"""
-        return processMsg(self.conn.recv(1024))
+    def getCurrentState(self):
+        """Wait for message and return current joints/pose from it or ERROR"""
+        current = processMsg(self.conn.recv(1024))
+        return current
 
 
     def sendClose(self):
         """Respond to client with close message"""
-        self.conn.send(createCloseMsg())
+        msg = createCloseMsg()
+        self.conn.send(msg)
     
 
-    def sendGoalJoints(self, goal_joints):
-        """Respond to client with goal joints"""
-        self.conn.send(createJointsMsg(goal_joints))
+    def sendGoalState(self, goal):
+        """Respond to client with goal joints/pose"""
+        msg = createPandaMsg(goal)
+        self.conn.send(msg)
 
 
 
@@ -64,32 +67,20 @@ if __name__ == "__main__":
     interface = PandaInterface(HOST, PORT)
 
     while True:
-        # Get current joints
-        current_joints = interface.getCurrentJoints()
+        # Wait for current joints/pose and get it
+        current = interface.getCurrentState()
+        print("Current State: {}".format(current))
 
         # Check error
-        if current_joints == 'error':
-            print("Panda Error!")
+        if current == 'error':
             break
-        else:
-            print("Current Joints: {}".format(current_joints))
 
         # Check close goal
-        code = input("Insert Code [q to quit]: ")
-        if code == 'q':
+        if input("Close? [y/n] ") == 'y':
             interface.sendClose()
             break
-        
-        # Process goal joints
-        if code == '1':
-            goal_joints = (-1.688, -0.369, 2.081, -2.628, -2.341, 0.454, 0.323, 0.0, 0.0)
-        elif code == '2':
-            goal_joints = (0.00, -0.25 * pi, 0.00, -0.75 * pi, 0.00, 0.50 * pi, 0.25 * pi, 0.01, 0.01)
-        elif code == '3':
-            goal_joints = (0, -pi/4, 0, -pi/2, 0, pi/3, 0, 0.0, 0.0)
-        else:
-            goal_joints = (0, 0, 0, 0, 0, 0, 0, 0, 0)
 
-        # Send goal joints
-        print("goal_joints: ", goal_joints)
-        interface.sendGoalJoints(goal_joints)
+        # Process goal and send it
+        goal = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+        print("goal: ", goal)
+        interface.sendGoalState(goal)

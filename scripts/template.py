@@ -16,11 +16,13 @@ def policy(current_joints):
     """POLICY DEFINITION"""
     code = input("Insert Code: ")
     if code == '1':
-        return (-1.688, -0.369, 2.081, -2.628, -2.341, 0.454, 0.323, 0.0, 0.0)
+        return (0.307019570052, -5.22132961561e-12, 0.590269558277, 0.923955699469, -0.382499497279, 1.3249325839e-12, 3.20041176635e-12, 0.07)
     elif code == '2':
-        return (0.00, -0.25 * pi, 0.00, -0.75 * pi, 0.00, 0.50 * pi, 0.25 * pi, 0.01, 0.01)
+        return (0.4, 0.1, 0.4, 0.0, 0.0, 0.0, 1.0, 0.00)
     elif code == '3':
-        return (0, -pi/4, 0, -pi/2, 0, pi/3, 0, 0.0, 0.0)
+        return (0.4, 0.1, 0.4, 0.0, 0.0, 0.0, 1.0, 0.01)
+    elif code == '4':
+        return (0.4, 0.1, 0.4, 0.0, 0.0, 0.0, 1.0, 0.70)
     else:
         return (0, 0, 0, 0, 0, 0, 0, 0, 0)
     
@@ -38,39 +40,39 @@ def training():
     env.close()
 
 
-def testing():
+def testing(HOST, PORT):
     """GYM TESTING WITH REAL PANDA"""
-    # Connection config
-    HOST = "127.0.0.1"
-    PORT = 2000
 
-    # Create gym interface for connect to panda
-    interface = PandaInterface(HOST, PORT)
+    # Create panda interface for connect to panda
+    panda = PandaInterface(HOST, PORT)
 
     while True:
-        # Get current joints
-        current_joints = interface.getCurrentJoints()
+        # Get current pose
+        current_pose = panda.getCurrentState()
+        print("Current Pose: {}".format(current_pose))
 
         # Check error
-        if current_joints == 'error':
-            print("Panda Error!")
+        if current_pose == 'error':
             break
-        else:
-            print("Current Joints: {}".format(current_joints))
 
         # Check close goal
         if isFinish():
-            interface.sendClose()
+            panda.sendClose()
             break
         
         # Process goal joints and execute them
-        goal_joints = policy(current_joints)
+        goal_pose = policy(current_pose)
 
         # Perform them
-        interface.sendGoalJoints(goal_joints)
+        panda.sendGoalState(goal_pose)
 
 
 
 if __name__ == "__main__":
+    # Connection config
+    HOST = "127.0.0.1"
+    PORT = 2000
+
     # training()
-    testing()
+    
+    testing(HOST, PORT)
