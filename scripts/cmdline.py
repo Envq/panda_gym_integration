@@ -43,7 +43,6 @@ def main(HOST, PORT):
             
             else:
                 cmd = command.split(" ")
-                print(cmd)
                 if len(cmd) != 9:
                     print("Command not valid")
 
@@ -51,7 +50,6 @@ def main(HOST, PORT):
                     goal = list()
                     for i in range(8):
                         goal.append(float(cmd[i + 1]))
-                    print(goal)
 
                     if cmd[0] == 'p':
                         print("Success? ", panda.moveToPose(goal))
