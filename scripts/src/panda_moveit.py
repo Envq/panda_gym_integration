@@ -19,12 +19,12 @@ class MoveGroupInterface(object):
   
 
   def getArmJoints(self):
-    """[j0, j1, j2, j3, j4, j5, j6, j7]"""
+    """[j0, j1, j2, j3, j4, j5, j6]"""
     return self.arm.get_current_joint_values()
 
 
   def getHandJoints(self):
-    """[j8, j9]"""
+    """[fj0 fj1]"""
     return self.hand.get_current_joint_values()
 
 
@@ -43,16 +43,17 @@ class MoveGroupInterface(object):
 
 
   def getJoints(self):
-    """[j0, j1, j2, j3, j4, j5, j6, j7, j8, j9]"""
+    """[j0, j1, j2, j3, j4, j5, j6, fj0 fj1]"""
     return self.getArmJoints() + self.getHandJoints()
   
 
   def getPose(self):
-    """[px, py, pz, ow, ox, oy, oz, gripper_size]"""
+    """[px, py, pz, ow, ox, oy, oz, fd] fd is the distance between the two fingers"""
     return self.getArmPose() + [self.getHandJoints()[0]*2]
   
 
   def moveToArmJoints(self, arm_goal_joints):
+    """[j0, j1, j2, j3, j4, j5, j6]"""
     if len(arm_goal_joints) != 7:
       return False
     try:
@@ -63,11 +64,10 @@ class MoveGroupInterface(object):
     return True
   
 
-  def moveToHandJoints(self, hand_goal_joints):
-    if len(hand_goal_joints) != 2:
-      return False
+  def moveToHandJoints(self, finger_goal_joint):
+    """[fj] There is only one finger because they must be equal"""
     try:
-      self.hand.plan(hand_goal_joints)
+      self.hand.plan([finger_goal_joint, finger_goal_joint])
       self.hand.go(wait=True)
     except MoveItCommanderException:
       return False
@@ -75,11 +75,12 @@ class MoveGroupInterface(object):
 
 
   def moveToJoints(self, goal_joints):
-    if len(goal_joints) != 9:
+    """[j0, j1, j2, j3, j4, j5, j6, fj] There is only one finger because they must be equal"""
+    if len(goal_joints) != 8:
       return False
     try:
       self.arm.plan(goal_joints[:7])
-      self.hand.plan(goal_joints[7:9])
+      self.hand.plan([goal_joints[7], goal_joints[7]])
       self.arm.go(wait=True)
       self.hand.go(wait=True)
     except MoveItCommanderException:
@@ -92,6 +93,7 @@ class MoveGroupInterface(object):
 
 
   def moveToArmPose(self, goal_pose):
+    """[px, py, pz, ow, ox, oy, oz]"""
     if len(goal_pose) != 7:
       return False
     target = geometry_msgs.msg.Pose()
@@ -111,6 +113,7 @@ class MoveGroupInterface(object):
 
 
   def moveToPose(self, goal_pose):
+    """[px, py, pz, ow, ox, oy, oz, fd] fd is the distance between the two fingers"""
     if len(goal_pose) != 8:
       return False
     target = geometry_msgs.msg.Pose()
@@ -146,16 +149,25 @@ if __name__ == '__main__':
     panda = MoveGroupInterface()
 
     # Print Status
+    print("ARM JOINTS: ")
     print(panda.getArmJoints())
-    print("--------------------")
+    print("--------------------\n")
+
+    print("HAND JOINTS:")
     print(panda.getHandJoints())
-    print("--------------------")
+    print("--------------------\n")
+
+    print("ALL JOINTS:")
     print(panda.getJoints())
-    print("--------------------")
+    print("--------------------\n")
+
+    print("ARM POSE:")
     print(panda.getArmPose())
-    print("--------------------")
+    print("--------------------\n")
+
+    print("POSE + GRIPPER DISTANCE:")
     print(panda.getPose())
-    print("--------------------")
+    print("--------------------\n")
 
     # Perform custom commands
     while True:
@@ -170,16 +182,16 @@ if __name__ == '__main__':
         # Fail test
         print("Success? ", panda.moveToArmJoints((0, 0, 0, 0, 0, 0, 0))) 
       elif (code == '4'):
-        print("Success? ", panda.moveToHandJoints((0.0, 0.0)))
+        print("Success? ", panda.moveToHandJoints(0))
       elif (code == '5'):
-        print("Success? ", panda.moveToHandJoints((0.01, 0.01)))
+        print("Success? ", panda.moveToHandJoints(0.01))
       elif (code == '6'):
-        print("Success? ", panda.moveToJoints((-1.92, -0.25, 2.27, -2.65, -2.58, 0.37, 0.15, 0.0, 0.0)))
+        print("Success? ", panda.moveToJoints((-1.92, -0.25, 2.27, -2.65, -2.58, 0.37, 0.15, 0.0)))
       elif (code == '7'):
-        print("Success? ", panda.moveToJoints((-1.92, -0.25, 2.27, -2.65, -2.58, 0.37, 0.15, 0.01, 0.01)))
+        print("Success? ", panda.moveToJoints((-1.92, -0.25, 2.27, -2.65, -2.58, 0.37, 0.15, 0.01)))
       elif (code == '8'):
         # Fail test
-        print("Success? ", panda.moveToJoints((-1.92, -0.25, 2.27, -2.65, -2.58, 0.37, 0.15, 0.1, 0.1))) 
+        print("Success? ", panda.moveToJoints((-1.92, -0.25, 2.27, -2.65, -2.58, 0.37, 0.15, 0.1))) 
       elif (code == '9'):
         print("Success? ", panda.moveToArmPose((0.4, 0.1, 0.4, 1.0, 0.0, 0.0, 0.0)))
       elif (code == '10'):

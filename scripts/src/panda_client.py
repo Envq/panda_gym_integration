@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 
-from .panda_msgs import createPandaMsg, processMsg, createErrorMsg
+from panda_msgs import createPandaMsg, processMsg, createErrorMsg
 import socket
 
 
@@ -64,7 +64,7 @@ if __name__ == "__main__":
 
     while True:
         # get current joints/pose and send it
-        current = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        current = [0, 1, 2, 3, 4, 5, 6, 7]
         print("current: ", current)
         interface.sendCurrentState(current)
 

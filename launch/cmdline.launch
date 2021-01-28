@@ -1,0 +1,4 @@
+<launch>
+  <node name="cmdline_node" pkg="panda_gym_moveit" type="cmdline.py" respawn="false" output="screen">
+  </node>
+</launch>

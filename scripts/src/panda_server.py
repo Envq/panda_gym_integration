@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from .panda_msgs import createPandaMsg, createCloseMsg, processMsg
+from panda_msgs import createPandaMsg, createCloseMsg, processMsg
 from math import pi
 import socket
 
@@ -81,6 +81,6 @@ if __name__ == "__main__":
             break
 
         # Process goal and send it
-        goal = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+        goal = [10, 11, 12, 13, 14, 15, 16, 17]
         print("goal: ", goal)
         interface.sendGoalState(goal)
