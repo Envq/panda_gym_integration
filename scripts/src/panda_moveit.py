@@ -105,11 +105,13 @@ class MoveGroupInterface(object):
     target.orientation.y = goal_pose[5]
     target.orientation.z = goal_pose[6]
     try:
-      self.arm.plan(target)
-      self.arm.go(wait=True)
+      plan = self.arm.plan(target)
+      if plan.joint_trajectory.points:
+        self.arm.execute(plan)
+        return True
+      return False
     except MoveItCommanderException:
       return False
-    return True
 
 
   def moveToPose(self, goal_pose):
@@ -126,9 +128,11 @@ class MoveGroupInterface(object):
     target.orientation.z = goal_pose[6]
     gripper = [goal_pose[7]/2.0, goal_pose[7]/2.0]
     try:
-      self.arm.plan(target)
+      plan = self.arm.plan(target)
       self.hand.plan(gripper)
-      self.arm.go(wait=True)
+      if not plan.joint_trajectory.points:
+        return False
+      self.arm.execute(plan)
       self.hand.go(wait=True)
     except MoveItCommanderException:
       return False
@@ -195,14 +199,23 @@ if __name__ == '__main__':
       elif (code == '9'):
         print("Success? ", panda.moveToArmPose((0.4, 0.1, 0.4, 1.0, 0.0, 0.0, 0.0)))
       elif (code == '10'):
-        print("Success? ", panda.moveToPose((0.4, 0.1, 0.4, 1.0, 0.0, 0.0, 0.0, 0.06)))
+        # Fail test
+        print("Success? ", panda.moveToArmPose((0, 0, 0, 0, 0, 0, 0)))
       elif (code == '11'):
-        print("Success? ", panda.moveToPose((0.4, 0.1, 0.4, 1.0, 0.0, 0.0, 0.0, 0.01)))
+        print("Success? ", panda.moveToPose((0.4, 0.1, 0.4, 1.0, 0.0, 0.0, 0.0, 0.06)))
       elif (code == '12'):
-        print("Success? ", panda.moveToPose((0.4, 0.1, 0.4, 1.0, 0.0, 0.0, 0.0, 0.00)))
+        print("Success? ", panda.moveToPose((0.4, 0.1, 0.4, 1.0, 0.0, 0.0, 0.0, 0.01)))
       elif (code == '13'):
+        print("Success? ", panda.moveToPose((0.4, 0.1, 0.4, 1.0, 0.0, 0.0, 0.0, 0.00)))
+      elif (code == '14'):
         # Fail test
         print("Success? ", panda.moveToPose((0.4, 0.1, 0.4, 1.0, 0.0, 0.0, 0.0, 0.1)))
+      elif (code == '15'):
+        # Strange test
+        print("Success? ", panda.moveToPose((0.4, 0.1, 0.4, 0, 0, 0, 0, 0)))
+      elif (code == '16'):
+        # Fail test
+        print("Success? ", panda.moveToPose((0, 0, 0, 0, 0, 0, 0, 0)))
       else:
         print("Code not valid")
 
