@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from panda_msgs import createPandaMsg, createCloseMsg, processMsg
+from .panda_msgs import createPandaMsg, createCloseMsg, processMsg
 from math import pi
 import socket
 

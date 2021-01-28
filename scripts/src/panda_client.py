@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 
-from panda_msgs import createPandaMsg, processMsg, createErrorMsg
+from .panda_msgs import createPandaMsg, processMsg, createErrorMsg
 import socket
 
 

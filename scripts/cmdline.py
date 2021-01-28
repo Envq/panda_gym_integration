@@ -68,4 +68,8 @@ def main(HOST, PORT):
 
 
 if __name__ == "__main__":
-    main()
+    # Connection config
+    HOST = "127.0.0.1"
+    PORT = 2000
+
+    main(HOST, PORT)
