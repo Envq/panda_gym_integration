@@ -16,7 +16,7 @@ def main(HOST, PORT):
         gym = GymInterface(HOST, PORT)
 
         # Create panda moveit interface
-        panda = MoveGroupInterface()
+        panda = MoveGroupInterface(1)
 
         while True:
             # Get current pose

@@ -1,0 +1,16 @@
+<launch>
+      <node name="console_node" 
+            pkg="panda_gym_moveit" 
+            type="console.py" 
+            respawn="false" 
+            output="screen">
+            <param name="px" type="double" value="0.3"/>
+            <param name="py" type="double" value="0.0"/>
+            <param name="pz" type="double" value="0.0"/>
+
+            <param name="ox" type="double" value="0.0"/>
+            <param name="oy" type="double" value="0.0"/>
+            <param name="oz" type="double" value="0.0"/>
+            <param name="ow" type="double" value="1.0"/>
+      </node>
+</launch>

@@ -4,20 +4,35 @@
 from __future__ import print_function
 from six.moves import input
 
+# Ros and Moveit
+import rospy
 from moveit_commander.exception import MoveItCommanderException
 import moveit_commander
-import geometry_msgs.msg
+
+# TF2
+import tf2_ros
+from tf.transformations import quaternion_multiply
+from geometry_msgs.msg import TransformStamped, PoseStamped
+
+# Other
 from math import pi
+import time
 
 
 
 class MoveGroupInterface(object):
-  def __init__(self):
+  def __init__(self, delay = 0):
     super(MoveGroupInterface, self).__init__()
     self.arm = moveit_commander.MoveGroupCommander("panda_arm")
     self.hand = moveit_commander.MoveGroupCommander("hand")
-  
+    self.tf_buffer = tf2_ros.Buffer()
+    self.tf_listener = tf2_ros.TransformListener(self.tf_buffer) 
 
+    # Wait for correct loading
+    time.sleep(delay) 
+    
+
+  # JOINTS------------------------------------------------------------
   def getArmJoints(self):
     """[j0, j1, j2, j3, j4, j5, j6]"""
     return self.arm.get_current_joint_values()
@@ -28,29 +43,10 @@ class MoveGroupInterface(object):
     return self.hand.get_current_joint_values()
 
 
-  def getArmPose(self):
-    """[px, py, pz, ow, ox, oy, oz]"""
-    pose = self.arm.get_current_pose().pose
-    l = list()
-    l.append(pose.position.x)
-    l.append(pose.position.y)
-    l.append(pose.position.z)
-    l.append(pose.orientation.w)
-    l.append(pose.orientation.x)
-    l.append(pose.orientation.y)
-    l.append(pose.orientation.z)
-    return l
-
-
   def getJoints(self):
     """[j0, j1, j2, j3, j4, j5, j6, fj0 fj1]"""
     return self.getArmJoints() + self.getHandJoints()
-  
 
-  def getPose(self):
-    """[px, py, pz, ow, ox, oy, oz, fd] fd is the distance between the two fingers"""
-    return self.getArmPose() + [self.getHandJoints()[0]*2]
-  
 
   def moveToArmJoints(self, arm_goal_joints):
     """[j0, j1, j2, j3, j4, j5, j6]"""
@@ -86,24 +82,56 @@ class MoveGroupInterface(object):
     except MoveItCommanderException:
       return False
     return True
-  
-  
-  def moveToReadyPose(self):
+
+
+  def moveToReady(self):
     return self.moveToArmJoints((0.00, -0.25 * pi, 0.00, -0.75 * pi, 0.00, 0.50 * pi, 0.25 * pi))
 
 
-  def moveToArmPose(self, goal_pose):
-    """[px, py, pz, ow, ox, oy, oz]"""
+  # HAND POSE---------------------------------------------------------
+  def getHandPose(self):
+    """[fd] fd is the distance beetween fingers"""
+    return [self.getHandJoints()[0]*2]
+
+
+  def moveToHandPose(self, goal_pose):
+    """[fd] fd is the distance beetween fingers"""
+    return self.moveToHandJoints(goal_pose / 2.0)
+
+
+  # WRIST POSE--------------------------------------------------------
+  def getArmPoseWrist(self):
+    """[px, py, pz, ox, oy, oz, ow]"""
+    pose = self.arm.get_current_pose().pose
+    wrist = list()
+    wrist.append(pose.position.x)
+    wrist.append(pose.position.y)
+    wrist.append(pose.position.z)
+    wrist.append(pose.orientation.x)
+    wrist.append(pose.orientation.y)
+    wrist.append(pose.orientation.z)
+    wrist.append(pose.orientation.w)
+    return wrist
+
+  
+  def getPoseWrist(self):
+    """[px, py, pz, ox, oy, oz, ow, fd]"""
+    return self.getArmPoseWrist() + self.getHandPose()
+
+
+  def moveToArmPoseWrist(self, goal_pose):
+    """[px, py, pz, ox, oy, oz, ow]"""
     if len(goal_pose) != 7:
       return False
-    target = geometry_msgs.msg.Pose()
-    target.position.x = goal_pose[0]
-    target.position.y = goal_pose[1]
-    target.position.z = goal_pose[2]
-    target.orientation.w = goal_pose[3]
-    target.orientation.x = goal_pose[4]
-    target.orientation.y = goal_pose[5]
-    target.orientation.z = goal_pose[6]
+    target = PoseStamped()
+    target.header.frame_id = "world"
+    target.pose.position.x = goal_pose[0]
+    target.pose.position.y = goal_pose[1]
+    target.pose.position.z = goal_pose[2]
+    target.pose.orientation.x = goal_pose[3]
+    target.pose.orientation.y = goal_pose[4]
+    target.pose.orientation.z = goal_pose[5]
+    target.pose.orientation.w = goal_pose[6]
     try:
       plan = self.arm.plan(target)
       if plan.joint_trajectory.points:
@@ -114,18 +142,19 @@ class MoveGroupInterface(object):
       return False
 
 
-  def moveToPose(self, goal_pose):
-    """[px, py, pz, ow, ox, oy, oz, fd] fd is the distance between the two fingers"""
+  def moveToPoseWrist(self, goal_pose):
+    """[px, py, pz, ox, oy, oz, ow, fd] fd is the distance between the two fingers"""
     if len(goal_pose) != 8:
       return False
-    target = geometry_msgs.msg.Pose()
-    target.position.x = goal_pose[0]
-    target.position.y = goal_pose[1]
-    target.position.z = goal_pose[2]
-    target.orientation.w = goal_pose[3]
-    target.orientation.x = goal_pose[4]
-    target.orientation.y = goal_pose[5]
-    target.orientation.z = goal_pose[6]
+    target = PoseStamped()
+    target.header.frame_id = "world"
+    target.pose.position.x = goal_pose[0]
+    target.pose.position.y = goal_pose[1]
+    target.pose.position.z = goal_pose[2]
+    target.pose.orientation.x = goal_pose[3]
+    target.pose.orientation.y = goal_pose[4]
+    target.pose.orientation.z = goal_pose[5]
+    target.pose.orientation.w = goal_pose[6]
     gripper = [goal_pose[7]/2.0, goal_pose[7]/2.0]
     try:
       plan = self.arm.plan(target)
@@ -139,10 +168,77 @@ class MoveGroupInterface(object):
     return True
 
 
+  # TCP POSE----------------------------------------------------------  
+  def getWristFromTCP(self, tcp_pose):
+    """Get the world-to-wrist (panda_link8) pose"""
+    # Get world -> tcp transform
+    world_to_tcp = TransformStamped()
+    world_to_tcp.header.frame_id = "world"
+    world_to_tcp.child_frame_id = "tcp"
+    world_to_tcp.transform.translation.x = tcp_pose[0]
+    world_to_tcp.transform.translation.y = tcp_pose[1]
+    world_to_tcp.transform.translation.z = tcp_pose[2]
+    world_to_tcp.transform.rotation.x = tcp_pose[3]
+    world_to_tcp.transform.rotation.y = tcp_pose[4]
+    world_to_tcp.transform.rotation.z = tcp_pose[5]
+    world_to_tcp.transform.rotation.w = tcp_pose[6]
+
+    # Get tcp -> wrist transform
+    tcp_to_wrist = self.tf_buffer.lookup_transform("tcp", "panda_link8", rospy.Time())
+
+    # Get world -> wrist with transforms composition
+    world_to_wrist = TransformStamped()
+    world_to_wrist.transform.translation.x = world_to_tcp.transform.translation.x + tcp_to_wrist.transform.translation.x
+    world_to_wrist.transform.translation.y = world_to_tcp.transform.translation.y + tcp_to_wrist.transform.translation.y
+    world_to_wrist.transform.translation.z = world_to_tcp.transform.translation.z + tcp_to_wrist.transform.translation.z
+    q1 = [world_to_tcp.transform.rotation.x, world_to_tcp.transform.rotation.y, world_to_tcp.transform.rotation.z, world_to_tcp.transform.rotation.w]
+    q2 = [tcp_to_wrist.transform.rotation.x, tcp_to_wrist.transform.rotation.y, tcp_to_wrist.transform.rotation.z, tcp_to_wrist.transform.rotation.w]
+    q3 = quaternion_multiply(q1, q2)
+    world_to_wrist.transform.rotation.x = q3[0]
+    world_to_wrist.transform.rotation.y = q3[1]
+    world_to_wrist.transform.rotation.z = q3[2]
+    world_to_wrist.transform.rotation.w = q3[3]
+
+    # Return results
+    trans = world_to_wrist.transform.translation
+    rot = world_to_wrist.transform.rotation
+    return [trans.x, trans.y, trans.z, rot.x, rot.y, rot.z, rot.w]
+  
+
+  def getArmPose(self):
+    """[px, py, pz, ox, oy, oz, ow] get the world-to-tcp (tool center point) pose"""
+    t = self.tf_buffer.lookup_transform("world", "tcp", rospy.Time())
+    trans = t.transform.translation
+    rot = t.transform.rotation
+    return [trans.x, trans.y, trans.z, rot.x, rot.y, rot.z, rot.w]
+
+
+  def getPose(self):
+    """[px, py, pz, ox, oy, oz, ow, fd] fd is the distance between the two fingers"""
+    return self.getArmPose() + self.getHandPose()
+  
+
+  def moveToArmPose(self, tcp_goal_pose):
+    """[px, py, pz, ox, oy, oz, ow]"""
+    # print("prima: ", goal_pose)
+    wrist_goal_pose = self.getWristFromTCP(tcp_goal_pose)
+    # print("dopo: ", goal_pose)
+    return self.moveToArmPoseWrist(wrist_goal_pose)
+
+
+  def moveToPose(self, tcp_goal_pose):
+    """[px, py, pz, ox, oy, oz, ow, fd] fd is the distance between the two fingers"""
+    # print("prima: ", goal_pose)    
+    wrist_goal_pose = self.getWristFromTCP(tcp_goal_pose[:7])
+    wrist_goal_pose.append(tcp_goal_pose[7])
+    # print("dopo: ", goal_pose)
+    return self.moveToPoseWrist(wrist_goal_pose)
+
+
 
 if __name__ == '__main__':
   """TEST"""
-  import sys, rospy
+  import sys
 
   try:
     # Initialize moveit_commander and rospy
@@ -150,72 +246,144 @@ if __name__ == '__main__':
     rospy.init_node('panda_moveit_interface_demo_node', anonymous=True)
 
     # Inizialize movegroupinterface
-    panda = MoveGroupInterface()
+    panda = MoveGroupInterface(1)
 
-    # Print Status
-    print("ARM JOINTS: ")
-    print(panda.getArmJoints())
-    print("--------------------\n")
-
-    print("HAND JOINTS:")
-    print(panda.getHandJoints())
-    print("--------------------\n")
-
-    print("ALL JOINTS:")
-    print(panda.getJoints())
-    print("--------------------\n")
-
-    print("ARM POSE:")
-    print(panda.getArmPose())
-    print("--------------------\n")
-
-    print("POSE + GRIPPER DISTANCE:")
-    print(panda.getPose())
-    print("--------------------\n")
 
     # Perform custom commands
     while True:
-      code = input("Insert code: ")
-      if (code == '0'):
+      cmd = input("Insert command: ")
+
+      if (cmd == "quit"):
         sys.exit()
-      elif (code == '1'):
-        print("Success? ", panda.moveToReadyPose())
-      elif (code == '2'):
-        print("Success? ", panda.moveToArmJoints((0, -pi/4, 0, -pi/2, 0, pi/3, 0)))
-      elif (code == '3'):
-        # Fail test
-        print("Success? ", panda.moveToArmJoints((0, 0, 0, 0, 0, 0, 0))) 
-      elif (code == '4'):
+      
+
+      elif (cmd == "print"):
+        print("HAND JOINTS:")
+        print(panda.getHandJoints())
+        print("--------------------\n")
+        print("ARM JOINTS: ")
+        print(panda.getArmJoints())
+        print("--------------------\n")
+        print("ALL JOINTS:")
+        print(panda.getJoints())
+        print("--------------------\n")
+
+        print("HAND POSE:")
+        print(panda.getHandPose())
+        print("--------------------\n")
+        print("ARM WRIST POSE:")
+        print(panda.getArmPoseWrist())
+        print("--------------------\n")
+        print("ARM TCP POSE:")
+        print(panda.getArmPose())
+        print("--------------------\n")
+        print("ALL WRIST POSE:")
+        print(panda.getPoseWrist())
+        print("--------------------\n")
+        print("ALL TCP POSE:")
+        print(panda.getPose())
+        print("--------------------\n")
+
+      
+
+      # JOINTS------------------------------------------------------------
+      elif (cmd == "ready"):
+        print("Success? ", panda.moveToReady())
+
+
+      elif (cmd == "hand j1"):
         print("Success? ", panda.moveToHandJoints(0))
-      elif (code == '5'):
+      elif (cmd == "hand j2"):
+        print("Success? ", panda.moveToHandJoints(0.035))
+      elif (cmd == "hand j3"):
         print("Success? ", panda.moveToHandJoints(0.01))
-      elif (code == '6'):
+      elif (cmd == "hand j4"):
+        # FAIL TEST
+        print("Success? ", panda.moveToHandJoints(1.0))
+      
+
+      elif (cmd == "arm j1"):
+        print("Success? ", panda.moveToArmJoints((0, -pi/4, 0, -pi/2, 0, pi/3, 0)))
+      elif (cmd == "arm j2"):
+        # FAIL TEST
+        print("Success? ", panda.moveToArmJoints((0, 0, 0, 0, 0, 0, 0))) 
+      
+
+      elif (cmd == "j1"):
         print("Success? ", panda.moveToJoints((-1.92, -0.25, 2.27, -2.65, -2.58, 0.37, 0.15, 0.0)))
-      elif (code == '7'):
+      elif (cmd == "j2"):
         print("Success? ", panda.moveToJoints((-1.92, -0.25, 2.27, -2.65, -2.58, 0.37, 0.15, 0.01)))
-      elif (code == '8'):
-        # Fail test
-        print("Success? ", panda.moveToJoints((-1.92, -0.25, 2.27, -2.65, -2.58, 0.37, 0.15, 0.1))) 
-      elif (code == '9'):
-        print("Success? ", panda.moveToArmPose((0.4, 0.1, 0.4, 1.0, 0.0, 0.0, 0.0)))
-      elif (code == '10'):
-        # Fail test
+      elif (cmd == "j3"):
+        # FAIL ARM TEST
+        print("Success? ", panda.moveToJoints((0, 0, 0, 0, 0, 0, 0, 0.0))) 
+      elif (cmd == "j4"):
+        # FAIL HAND TEST
+        print("Success? ", panda.moveToJoints((-1.92, -0.25, 2.27, -2.65, -2.58, 0.37, 0.15, 1.0))) 
+
+
+      # HAND POSE---------------------------------------------------------
+      elif (cmd == "hand p1"):
+        print("Success? ", panda.moveToHandPose(0))
+      elif (cmd == "hand p2"):
+        print("Success? ", panda.moveToHandPose(0.07))
+      elif (cmd == "hand p3"):
+        print("Success? ", panda.moveToHandPose(0.01))
+      elif (cmd == "hand p4"):
+        # FAIL TEST
+        print("Success? ", panda.moveToHandPose(1.0))
+
+
+      # WRIST POSE--------------------------------------------------------
+      elif (cmd == "arm wrist p1"):
+        print("Success? ", panda.moveToArmPoseWrist((0.4, 0.1, 0.4, 0.0, 0.0, 0.0, 1.0)))
+      elif (cmd == "arm wrist p2"):
+        # FAIL TEST
+        print("Success? ", panda.moveToArmPoseWrist((0, 0, 0, 0, 0, 0, 0)))
+
+
+      elif (cmd == "wrist p1"):
+        print("Success? ", panda.moveToPoseWrist((0.4, 0.1, 0.4, 0.0, 0.0, 0.0, 1.0, 0.06)))
+      elif (cmd == "wrist p2"):
+        print("Success? ", panda.moveToPoseWrist((0.4, 0.1, 0.4, 0.0, 0.0, 0.0, 1.0, 0.01)))
+      elif (cmd == "wrist p3"):
+        print("Success? ", panda.moveToPoseWrist((0.4, 0.1, 0.4, 0.0, 0.0, 0.0, 1.0, 0.00)))
+      elif (cmd == "wrist p4"):
+        # STRANGE TEST
+        print("Success? ", panda.moveToPoseWrist((0.4, 0.1, 0.4, 0, 0, 0, 0, 0)))
+      elif (cmd == "wrist p5"):
+        # FAIL ARM TEST
+        print("Success? ", panda.moveToPoseWrist((0, 0, 0, 0, 0, 0, 0, 0)))
+      elif (cmd == "wrist p6"):
+        # FAIL HAND TEST
+        print("Success? ", panda.moveToPoseWrist((0.4, 0.1, 0.4, 0.0, 0.0, 0.0, 1.0, 1.0)))
+
+
+      # TCP POSE----------------------------------------------------------
+      elif (cmd == "arm p1"):
+        print("Success? ", panda.moveToArmPose((0.4, 0.1, 0.4, 0.0, 0.0, 0.0, 1.0)))
+      elif (cmd == "arm p2"):
+        # FAIL TEST
         print("Success? ", panda.moveToArmPose((0, 0, 0, 0, 0, 0, 0)))
-      elif (code == '11'):
-        print("Success? ", panda.moveToPose((0.4, 0.1, 0.4, 1.0, 0.0, 0.0, 0.0, 0.06)))
-      elif (code == '12'):
-        print("Success? ", panda.moveToPose((0.4, 0.1, 0.4, 1.0, 0.0, 0.0, 0.0, 0.01)))
-      elif (code == '13'):
-        print("Success? ", panda.moveToPose((0.4, 0.1, 0.4, 1.0, 0.0, 0.0, 0.0, 0.00)))
-      elif (code == '14'):
-        # Fail test
-        print("Success? ", panda.moveToPose((0.4, 0.1, 0.4, 1.0, 0.0, 0.0, 0.0, 0.1)))
-      elif (code == '15'):
-        # Strange test
+
+
+      elif (cmd == "p1"):
+        print("Success? ", panda.moveToPose((0.4, 0.1, 0.4, 0.0, 0.0, 0.0, 1.0, 0.06)))
+      elif (cmd == "p2"):
+        print("Success? ", panda.moveToPose((0.4, 0.1, 0.4, 0.0, 0.0, 0.0, 1.0, 0.01)))
+      elif (cmd == "p3"):
+        print("Success? ", panda.moveToPose((0.4, 0.1, 0.4, 0.0, 0.0, 0.0, 1.0, 0.00)))
+      elif (cmd == "p4"):
+        # STRANGE TEST
         print("Success? ", panda.moveToPose((0.4, 0.1, 0.4, 0, 0, 0, 0, 0)))
-      elif (code == '16'):
-        # Fail test
+      elif (cmd == "p5"):
+        # FAIL ARM TEST
         print("Success? ", panda.moveToPose((0, 0, 0, 0, 0, 0, 0, 0)))
+      elif (cmd == "p6"):
+        # FAIL HAND TEST
+        print("Success? ", panda.moveToPose((0.4, 0.1, 0.4, 0.0, 0.0, 0.0, 1.0, 1.0)))
+      
+      
+
       else:
         print("Code not valid")
 
@@ -225,4 +393,3 @@ if __name__ == '__main__':
   except KeyboardInterrupt:
     print("Keboard quit")
     sys.exit()
-    
