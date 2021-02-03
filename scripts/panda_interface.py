@@ -21,12 +21,14 @@ def main(HOST, PORT):
         while True:
             # Get current pose
             current_pose = panda.getPose()
+            # print(current_pose)
 
             # Send current pose
             gym.sendCurrentState(current_pose)
 
             # Get goal pose
             goal_pose = gym.getGoalState()
+            # print(goal_pose)
             
             # Check close
             if goal_pose == 'close':

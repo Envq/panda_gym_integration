@@ -205,7 +205,7 @@ class MoveGroupInterface(object):
     return [trans.x, trans.y, trans.z, rot.x, rot.y, rot.z, rot.w]
   
 
-  def getArmPose(self):
+  def getArmPoseTCP(self):
     """[px, py, pz, ox, oy, oz, ow] get the world-to-tcp (tool center point) pose"""
     t = self.tf_buffer.lookup_transform("world", "tcp", rospy.Time())
     trans = t.transform.translation
@@ -213,12 +213,12 @@ class MoveGroupInterface(object):
     return [trans.x, trans.y, trans.z, rot.x, rot.y, rot.z, rot.w]
 
 
-  def getPose(self):
+  def getPoseTCP(self):
     """[px, py, pz, ox, oy, oz, ow, fd] fd is the distance between the two fingers"""
-    return self.getArmPose() + self.getHandPose()
+    return self.getArmPoseTCP() + self.getHandPose()
   
 
-  def moveToArmPose(self, tcp_goal_pose):
+  def moveToArmPoseTCP(self, tcp_goal_pose):
     """[px, py, pz, ox, oy, oz, ow]"""
     # print("prima: ", goal_pose)
     wrist_goal_pose = self.getWristFromTCP(tcp_goal_pose)
@@ -226,13 +226,31 @@ class MoveGroupInterface(object):
     return self.moveToArmPoseWrist(wrist_goal_pose)
 
 
-  def moveToPose(self, tcp_goal_pose):
+  def moveToPoseTCP(self, tcp_goal_pose):
     """[px, py, pz, ox, oy, oz, ow, fd] fd is the distance between the two fingers"""
     # print("prima: ", goal_pose)    
     wrist_goal_pose = self.getWristFromTCP(tcp_goal_pose[:7])
     wrist_goal_pose.append(tcp_goal_pose[7])
     # print("dopo: ", goal_pose)
     return self.moveToPoseWrist(wrist_goal_pose)
+
+
+  # INTERFACE POSE----------------------------------------------------
+  def getPose(self):
+    """[px, py, pz, ox, oy, oz, ow, fd] fd is the distance between the two fingers"""
+    return self.getPoseTCP()
+
+
+  def moveToPose(self, tcp_goal_pose):
+    """[px, py, pz, ox, oy, oz, ow, fd, gr]
+        fd is the distance between the two fingers
+        gr is 1 if the grasp is active, otherwise 0"""
+    if self.moveToPoseTCP(tcp_goal_pose[:8]):
+      if tcp_goal_pose[8] == 1:
+        print("GRASPING...")
+      return True
+    return False
+    
 
 
 
@@ -275,13 +293,13 @@ if __name__ == '__main__':
         print(panda.getArmPoseWrist())
         print("--------------------\n")
         print("ARM TCP POSE:")
-        print(panda.getArmPose())
+        print(panda.getArmPoseTCP())
         print("--------------------\n")
         print("ALL WRIST POSE:")
         print(panda.getPoseWrist())
         print("--------------------\n")
         print("ALL TCP POSE:")
-        print(panda.getPose())
+        print(panda.getPoseTCP())
         print("--------------------\n")
 
       
@@ -360,27 +378,27 @@ if __name__ == '__main__':
 
       # TCP POSE----------------------------------------------------------
       elif (cmd == "arm p1"):
-        print("Success? ", panda.moveToArmPose((0.4, 0.1, 0.4, 0.0, 0.0, 0.0, 1.0)))
+        print("Success? ", panda.moveToArmPoseTCP((0.4, 0.1, 0.4, 0.0, 0.0, 0.0, 1.0)))
       elif (cmd == "arm p2"):
         # FAIL TEST
-        print("Success? ", panda.moveToArmPose((0, 0, 0, 0, 0, 0, 0)))
+        print("Success? ", panda.moveToArmPoseTCP((0, 0, 0, 0, 0, 0, 0)))
 
 
       elif (cmd == "p1"):
-        print("Success? ", panda.moveToPose((0.4, 0.1, 0.4, 0.0, 0.0, 0.0, 1.0, 0.06)))
+        print("Success? ", panda.moveToPoseTCP((0.4, 0.1, 0.4, 0.0, 0.0, 0.0, 1.0, 0.06)))
       elif (cmd == "p2"):
-        print("Success? ", panda.moveToPose((0.4, 0.1, 0.4, 0.0, 0.0, 0.0, 1.0, 0.01)))
+        print("Success? ", panda.moveToPoseTCP((0.4, 0.1, 0.4, 0.0, 0.0, 0.0, 1.0, 0.01)))
       elif (cmd == "p3"):
-        print("Success? ", panda.moveToPose((0.4, 0.1, 0.4, 0.0, 0.0, 0.0, 1.0, 0.00)))
+        print("Success? ", panda.moveToPoseTCP((0.4, 0.1, 0.4, 0.0, 0.0, 0.0, 1.0, 0.00)))
       elif (cmd == "p4"):
         # STRANGE TEST
-        print("Success? ", panda.moveToPose((0.4, 0.1, 0.4, 0, 0, 0, 0, 0)))
+        print("Success? ", panda.moveToPoseTCP((0.4, 0.1, 0.4, 0, 0, 0, 0, 0)))
       elif (cmd == "p5"):
         # FAIL ARM TEST
-        print("Success? ", panda.moveToPose((0, 0, 0, 0, 0, 0, 0, 0)))
+        print("Success? ", panda.moveToPoseTCP((0, 0, 0, 0, 0, 0, 0, 0)))
       elif (cmd == "p6"):
         # FAIL HAND TEST
-        print("Success? ", panda.moveToPose((0.4, 0.1, 0.4, 0.0, 0.0, 0.0, 1.0, 1.0)))
+        print("Success? ", panda.moveToPoseTCP((0.4, 0.1, 0.4, 0.0, 0.0, 0.0, 1.0, 1.0)))
       
       
 

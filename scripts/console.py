@@ -11,12 +11,14 @@ def help():
     print("p 'px' 'py' 'pz' 'ox' 'oy' 'oz' 'ow 'fingersDistance'  -> TCP-Pose-Move")
     print("w 'px' 'py' 'pz' 'ox' 'oy' 'oz' 'ow 'fingersDistance'  -> Wrist-Pose-Move")
     print("joints                                                 -> get joints")
-    print("pose                                                   -> get pose of TCP")
+    print("pose                                                   -> get TCP pose")
+    print("tcp                                                    -> get TCP pose")
     print("wrist                                                  -> get wrist pose")
     print("convert 'x' 'y' 'z' 'w'                                -> Quaternion in Euler[Rad]")
     print("convert 'x' 'y' 'z'                                    -> Euler[Rad] in Quaternion")
     print("ready                                                  -> go to ready pose")
-    print("custom                                                 -> execute armPose from rosparam")
+    print("custom1                                                -> execute moveToArmPoseTCP from rosparam")
+    print("custom2                                                -> execute moveToPose from rosparam")
     print("quit                                                   -> exit from console")
     print("help                                                   -> print this")
 
@@ -29,15 +31,27 @@ def main():
         rospy.init_node('console', anonymous=True)
 
         # Get custom pose from param
-        custom_pose = list()
-        custom_pose.append(rospy.get_param('~px', 0.0))
-        custom_pose.append(rospy.get_param('~py', 0.0))
-        custom_pose.append(rospy.get_param('~pz', 0.0))
-        custom_pose.append(rospy.get_param('~ox', 0.0))
-        custom_pose.append(rospy.get_param('~oy', 0.0))
-        custom_pose.append(rospy.get_param('~oz', 0.0))
-        custom_pose.append(rospy.get_param('~ow', 1.0))
-        # print(custom_pose)
+        custom_pose1 = list()
+        custom_pose1.append(rospy.get_param('~px1', 0.0))
+        custom_pose1.append(rospy.get_param('~py1', 0.0))
+        custom_pose1.append(rospy.get_param('~pz1', 0.0))
+        custom_pose1.append(rospy.get_param('~ox1', 0.0))
+        custom_pose1.append(rospy.get_param('~oy1', 0.0))
+        custom_pose1.append(rospy.get_param('~oz1', 0.0))
+        custom_pose1.append(rospy.get_param('~ow1', 1.0))
+        # print(custom_pose1)
+
+        custom_pose2 = list()
+        custom_pose2.append(rospy.get_param('~px2', 0.0))
+        custom_pose2.append(rospy.get_param('~py2', 0.0))
+        custom_pose2.append(rospy.get_param('~pz2', 0.0))
+        custom_pose2.append(rospy.get_param('~ox2', 0.0))
+        custom_pose2.append(rospy.get_param('~oy2', 0.0))
+        custom_pose2.append(rospy.get_param('~oz2', 0.0))
+        custom_pose2.append(rospy.get_param('~ow2', 1.0))
+        custom_pose2.append(rospy.get_param('~fd2', 0.0))
+        custom_pose2.append(rospy.get_param('~gr2', 1.0))
+        # print(custom_pose2)
 
         # Create panda moveit interface
         panda = MoveGroupInterface(1)
@@ -56,17 +70,23 @@ def main():
             elif (command == "joints"):
                 print(panda.getJoints())
             
-            elif (command == "pose"):
-                print(panda.getPose())
+            elif (command == "tcp"):
+                print(panda.getPoseTCP())
 
             elif (command == "wrist"):
                 print(panda.getPoseWrist())
+
+            elif (command == "pose"):
+                print(panda.getPose())
                         
             elif (command == "ready"):
                  print("Success? ", panda.moveToReady())
 
-            elif (command == "custom"):
-                print("Success? ", panda.moveToArmPose(custom_pose))
+            elif (command == "custom1"):
+                print("Success? ", panda.moveToArmPoseTCP(custom_pose1))
+
+            elif (command == "custom2"):
+                print("Success? ", panda.moveToPose(custom_pose2))
             
             else:
                 cmd = command.split(" ")
@@ -80,7 +100,7 @@ def main():
                     goal = list()
                     for i in range(len(cmd) - 1):
                         goal.append(float(cmd[i + 1]))
-                    print("Success? ", panda.moveToPose(goal))
+                    print("Success? ", panda.moveToPoseTCP(goal))
 
                 elif cmd[0] == 'w':
                     goal = list()

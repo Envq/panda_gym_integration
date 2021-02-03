@@ -27,7 +27,7 @@ if __name__ == '__main__':
     """TEST"""
     
     print("Create joints message")
-    panda_msg = createPandaMsg(('1', '1', '1', '1.5', '0', '0', '1'))
+    panda_msg = createPandaMsg(('1', '1', '1', '1.5', '0', '0', '1', '1', '0'))
     print(panda_msg)
     print(processMsg(panda_msg))
     print()

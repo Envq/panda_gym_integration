@@ -35,8 +35,9 @@ class Actor():
         x = obs[0] + action[0]
         y = obs[1] + action[1]
         z = obs[2] + action[2]
-        d = obs[3]*2 + action[3]*2
-        new_pose = [x, y, z, 0, 0, 0, 1, d]
+        grip = obs[3]*2 + action[3]*2
+        grasp = 0
+        new_pose = [x, y, z, 0, 0, 0, 1, grip, grasp]
         # print("panda new target pose: ", new_pose)
         return new_pose
     
@@ -49,7 +50,7 @@ def testing(panda):
 
     # Initialize real robot:
     panda.getCurrentState()
-    start_pose = [0.30686807928115, 4.6674387784271756e-05, 0.4867293030857287, 3.254063654416475e-05, 8.471364455930387e-05, 6.05906646632388e-05, 0.9999999940467379, 0.00017906040996313097] # Ready pose
+    start_pose = [0.30686807928115, 4.6674387784271756e-05, 0.4867293030857287, 3.254063654416475e-05, 8.471364455930387e-05, 6.05906646632388e-05, 0.9999999940467379, 0.00017906040996313097, 0] # Ready pose
     panda.sendGoalState(start_pose) 
 
     # Get current pose of Panda
