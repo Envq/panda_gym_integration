@@ -56,7 +56,7 @@ if __name__ == "__main__":
 
     # Connection config
     HOST = "127.0.0.1"
-    PORT = 2000
+    PORT = 2001
 
     # Update HOST and PORT
     if (len(sys.argv) == 3):
@@ -81,6 +81,6 @@ if __name__ == "__main__":
             break
 
         # Process goal and send it
-        goal = [10, 11, 12, 13, 14, 15, 16, 17]
+        goal = [10, 11, 12, 13, 14, 15, 16, -3.8623752044513406e-06]
         print("goal: ", goal)
         interface.sendGoalState(goal)

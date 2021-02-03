@@ -51,7 +51,7 @@ if __name__ == "__main__":
 
     # Connection config
     HOST = "127.0.0.1"
-    PORT = 2000
+    PORT = 2001
 
     # Update HOST and PORT
     if (len(sys.argv) == 3):
