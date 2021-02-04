@@ -56,7 +56,7 @@ def print_col(msg, colorName):
 
 def _testALL():
     for key, value in Colors.items():
-        print_col("testing...", key)
+        print_col(key, key)
 
 
 
