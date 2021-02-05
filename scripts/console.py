@@ -7,9 +7,10 @@ from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
 def help():
     print("Commands available:")
+    print("Note: ',' are automatically ignored")
     print("j 'j0' 'j1' 'j2' 'j3' 'j4' 'j5' 'j6' 'fingerJoints'    -> Joint-Move")
     print("p 'px' 'py' 'pz' 'ox' 'oy' 'oz' 'ow 'fingersDistance'  -> TCP-Pose-Move")
-    print("w 'px' 'py' 'pz' 'ox' 'oy' 'oz' 'ow 'fingersDistance'  -> Wrist-Pose-Move")
+    print("w 'px' 'py' 'pz' 'ox' 'oy' 'oz, 'ow 'fingersDistance'  -> Wrist-Pose-Move")
     print("joints                                                 -> get joints")
     print("pose                                                   -> get TCP pose")
     print("tcp                                                    -> get TCP pose")
@@ -93,25 +94,25 @@ def main():
                 if cmd[0] == 'j':
                     goal = list()
                     for i in range(len(cmd) - 1):
-                        goal.append(float(cmd[i + 1]))
+                        goal.append(float(cmd[i + 1].replace(',','')))
                     print("Success? ", panda.moveToJoints(goal))
 
                 elif cmd[0] == 'p':
                     goal = list()
                     for i in range(len(cmd) - 1):
-                        goal.append(float(cmd[i + 1]))
+                        goal.append(float(cmd[i + 1].replace(',','')))
                     print("Success? ", panda.moveToPoseTCP(goal))
 
                 elif cmd[0] == 'w':
                     goal = list()
                     for i in range(len(cmd) - 1):
-                        goal.append(float(cmd[i + 1]))
+                        goal.append(float(cmd[i + 1].replace(',','')))
                     print("Success? ", panda.moveToPoseWrist(goal))
                 
                 elif cmd[0] == 'convert':
                     val = list()
                     for i in range(len(cmd) - 1):
-                        val.append(float(cmd[i + 1]))
+                        val.append(float(cmd[i + 1].replace(',','')))
                     print(val)
                     if len(val) == 4:
                         print("Euler -> ", euler_from_quaternion(val))
