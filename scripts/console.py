@@ -7,7 +7,9 @@ from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
 def help():
     print("Commands available:")
-    print("Note: ',' are automatically ignored")
+    print("Notes:")
+    print("  ',' are automatically ignored")
+    print("  fingerJoints and fingersDistance are optional")
     print("j 'j0' 'j1' 'j2' 'j3' 'j4' 'j5' 'j6' 'fingerJoints'    -> Joint-Move")
     print("p 'px' 'py' 'pz' 'ox' 'oy' 'oz' 'ow 'fingersDistance'  -> TCP-Pose-Move")
     print("w 'px' 'py' 'pz' 'ox' 'oy' 'oz, 'ow 'fingersDistance'  -> Wrist-Pose-Move")
@@ -91,23 +93,39 @@ def main():
             
             else:
                 cmd = command.split(" ")
+                print(cmd)
                 if cmd[0] == 'j':
                     goal = list()
                     for i in range(len(cmd) - 1):
                         goal.append(float(cmd[i + 1].replace(',','')))
-                    print("Success? ", panda.moveToJoints(goal))
+                    if len(goal) == 7:
+                        print("Success? ", panda.moveToArmJoints(goal))
+                    elif len(goal) == 8:
+                        print("Success? ", panda.moveToJoints(goal))
+                    else:
+                        print("Command not valid")
 
                 elif cmd[0] == 'p':
                     goal = list()
                     for i in range(len(cmd) - 1):
                         goal.append(float(cmd[i + 1].replace(',','')))
-                    print("Success? ", panda.moveToPoseTCP(goal))
+                    if len(goal) == 7:
+                        print("Success? ", panda.moveToArmPoseTCP(goal))
+                    elif len(goal) == 8:
+                        print("Success? ", panda.moveToPoseTCP(goal))
+                    else:
+                        print("Command not valid")
 
                 elif cmd[0] == 'w':
                     goal = list()
                     for i in range(len(cmd) - 1):
                         goal.append(float(cmd[i + 1].replace(',','')))
-                    print("Success? ", panda.moveToPoseWrist(goal))
+                    if len(goal) == 7:
+                        print("Success? ", panda.moveToArmPoseWrist(goal))
+                    elif len(goal) == 8:
+                        print("Success? ", panda.moveToPoseWrist(goal))
+                    else:
+                        print("Command not valid")
                 
                 elif cmd[0] == 'convert':
                     val = list()
