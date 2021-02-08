@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 
-from src.panda_moveit import MoveGroupInterface
+from src.panda_moveit import PandaMoveitInterface
 import sys, rospy, moveit_commander
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
@@ -57,7 +57,7 @@ def main():
         # print(custom_pose2)
 
         # Create panda moveit interface
-        panda = MoveGroupInterface(1)
+        panda = PandaMoveitInterface(delay=1)
         
         help()
         while True:
