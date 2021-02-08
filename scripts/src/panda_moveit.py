@@ -20,9 +20,9 @@ import time
 
 
 
-class MoveGroupInterface(object):
+class PandaMoveitInterface(object):
   def __init__(self, delay = 0):
-    super(MoveGroupInterface, self).__init__()
+    super(PandaMoveitInterface, self).__init__()
     self.arm = moveit_commander.MoveGroupCommander("panda_arm")
     self.hand = moveit_commander.MoveGroupCommander("hand")
     self.tf_buffer = tf2_ros.Buffer()
@@ -261,7 +261,7 @@ def test1(sys):
     rospy.init_node('panda_moveit_interface_demo_node', anonymous=True)
 
     # Inizialize movegroupinterface
-    panda = MoveGroupInterface(1)
+    panda = PandaMoveitInterface(delay=1)
 
 
     # Perform custom commands
@@ -414,7 +414,7 @@ def test2(sys):
     rospy.init_node('panda_moveit_interface_demo_node', anonymous=True)
 
     # Inizialize movegroupinterface
-    panda = MoveGroupInterface(1)
+    panda = PandaMoveitInterface(delay=1)
 
     # current = panda.getArmPoseWrist()
     current = panda.getArmJoints()

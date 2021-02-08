@@ -1,7 +1,7 @@
 #!/usr/bin/env python2
 
 from src.panda_client import GymInterface
-from src.panda_moveit import MoveGroupInterface
+from src.panda_moveit import PandaMoveitInterface
 import sys, rospy, moveit_commander
 
 
@@ -16,7 +16,7 @@ def main(HOST, PORT):
         gym = GymInterface(HOST, PORT)
 
         # Create panda moveit interface
-        panda = MoveGroupInterface(1)
+        panda = PandaMoveitInterface(delay=1)
 
         while True:
             # Get current pose

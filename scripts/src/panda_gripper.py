@@ -8,7 +8,7 @@ from franka_gripper.msg import HomingGoal, MoveGoal, GraspGoal, StopGoal
 
 
 
-class PandaGripper():
+class PandaGripperInterface():
     def __init__(self, startup_homing = False): 
         # Create action clients
         self._client_homing = actionlib.SimpleActionClient('franka_gripper/homing', HomingAction)
@@ -82,11 +82,11 @@ class PandaGripper():
 if __name__ == '__main__':
     rospy.init_node('panda_gripper_node')
 
-    print("Create PandaGripper")
-    gripper = PandaGripper(startup_homing=False)
+    print("Create PandaGripperInterface")
+    gripper = PandaGripperInterface(startup_homing=False)
 
-    print("PandaGripper.hominge()")
+    print("PandaGripperInterface.homing()")
     gripper.homing()
 
-    print("PandaGripper.move()")
+    print("PandaGripperInterface.move()")
     gripper.move(width=0.07, speed=1.0)
