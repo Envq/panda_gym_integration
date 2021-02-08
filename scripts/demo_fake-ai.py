@@ -5,9 +5,10 @@ from src.colors import print_col
 import gym, panda_gym
 
 
-class Actor():
+class PandaActor():
     def __init__(self):
         pass
+
 
     def _goalAchieved(self, goal, obs, th = 0.01):
         isAchieved = (obs[0] > (goal[0] - th)) and (obs[0] < (goal[0] + th)) and \
@@ -19,6 +20,7 @@ class Actor():
         else:
             return 0
 
+
     def _getObs(self, current_pose):
         # Get Observation: [p_x, p_y, p_z,  p_g1, p_g2,  v_x, v_y, v_z,  v_g1, v_g2]
         obs = [ current_pose[0], \
@@ -28,6 +30,7 @@ class Actor():
                 current_pose[7] / 2.0 ]
         return obs   
     
+
     def _getAction(self, obs, time_step):
         if time_step < 5:
             delta = 0.01
@@ -44,7 +47,7 @@ class Actor():
         print("action: ", action)
         
         # Perform action with real robot:
-        # world_to_gripper -> gripper_to_target
+        # world_to_tcp -> tcp_to_target
         x = obs[0] + action[0]
         y = obs[1] + action[1]
         z = obs[2] + action[2]
@@ -72,11 +75,11 @@ def testing(panda):
 
     # Catch moveit error
     if current_pose == "error":
-        print("Abort")
+        print_col("Abort", 'FG_RED')
         return
 
     # Initialize Actor
-    my_actor = Actor()
+    my_actor = PandaActor()
 
     for i in range(NUM_SCEN):
         # Generate goal

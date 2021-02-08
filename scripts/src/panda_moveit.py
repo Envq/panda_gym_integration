@@ -254,10 +254,7 @@ class MoveGroupInterface(object):
 
 
 
-if __name__ == '__main__':
-  """TEST"""
-  import sys
-
+def test1(sys):
   try:
     # Initialize moveit_commander and rospy
     moveit_commander.roscpp_initialize(sys.argv)
@@ -272,9 +269,8 @@ if __name__ == '__main__':
       cmd = input("Insert command: ")
 
       if (cmd == "quit"):
-        sys.exit()
+        return
       
-
       elif (cmd == "print"):
         print("HAND JOINTS:")
         print(panda.getHandJoints())
@@ -400,14 +396,50 @@ if __name__ == '__main__':
         # FAIL HAND TEST
         print("Success? ", panda.moveToPoseTCP((0.4, 0.1, 0.4, 0.0, 0.0, 0.0, 1.0, 1.0)))
       
-      
-
       else:
         print("Code not valid")
 
   except rospy.ROSInterruptException:
     print("ROS interrupted")
-    sys.exit()
+    return
   except KeyboardInterrupt:
     print("Keboard quit")
-    sys.exit()
+    return
+
+
+def test2(sys):
+  try:
+    # Initialize moveit_commander and rospy
+    moveit_commander.roscpp_initialize(sys.argv)
+    rospy.init_node('panda_moveit_interface_demo_node', anonymous=True)
+
+    # Inizialize movegroupinterface
+    panda = MoveGroupInterface(1)
+
+    # current = panda.getArmPoseWrist()
+    current = panda.getArmJoints()
+
+    for t in range(10):
+      current[0] += 0.05
+      # print(panda.moveToArmPoseWrist(current))
+      print(panda.moveToArmJoints(current))
+      print("time step: ", t)
+
+    for t in range(10):
+      current[0] -= 0.05
+      # print(panda.moveToArmPoseWrist(current))
+      print(panda.moveToArmJoints(current))
+      print("time step: ", t)
+
+  except rospy.ROSInterruptException:
+    print("ROS interrupted")
+    return
+
+
+
+if __name__ == '__main__':
+  """TEST"""
+  import sys
+  # test1(sys)
+  test2(sys)
+  
