@@ -124,7 +124,7 @@ class PandaMoveitInterface(object):
     if len(goal_pose) != 7:
       return False
     target = PoseStamped()
-    target.header.frame_id = "world"
+    target.header.frame_id = "panda_link0"
     target.pose.position.x = goal_pose[0]
     target.pose.position.y = goal_pose[1]
     target.pose.position.z = goal_pose[2]
@@ -147,7 +147,7 @@ class PandaMoveitInterface(object):
     if len(goal_pose) != 8:
       return False
     target = PoseStamped()
-    target.header.frame_id = "world"
+    target.header.frame_id = "panda_link0"
     target.pose.position.x = goal_pose[0]
     target.pose.position.y = goal_pose[1]
     target.pose.position.z = goal_pose[2]
@@ -173,7 +173,7 @@ class PandaMoveitInterface(object):
     """Get the world-to-wrist (panda_link8) pose"""
     # Get world -> tcp transform
     world_to_tcp = TransformStamped()
-    world_to_tcp.header.frame_id = "world"
+    world_to_tcp.header.frame_id = "panda_link0"
     world_to_tcp.child_frame_id = "tcp"
     world_to_tcp.transform.translation.x = tcp_pose[0]
     world_to_tcp.transform.translation.y = tcp_pose[1]
@@ -207,7 +207,7 @@ class PandaMoveitInterface(object):
 
   def getArmPoseTCP(self):
     """[px, py, pz, ox, oy, oz, ow] get the world-to-tcp (tool center point) pose"""
-    t = self.tf_buffer.lookup_transform("world", "tcp", rospy.Time())
+    t = self.tf_buffer.lookup_transform("panda_link0", "tcp", rospy.Time())
     trans = t.transform.translation
     rot = t.transform.rotation
     return [trans.x, trans.y, trans.z, rot.x, rot.y, rot.z, rot.w]
