@@ -4,7 +4,7 @@ import rospy
 import actionlib
 
 from franka_gripper.msg import HomingAction, MoveAction, GraspAction, StopAction
-from franka_gripper.msg import HomingGoal, MoveGoal, GraspGoal, StopGoal
+from franka_gripper.msg import HomingGoal, MoveGoal, GraspGoal, StopGoal, GraspEpsilon
 
 
 
@@ -34,21 +34,21 @@ class PandaGripperInterface():
 
     def _normalize(self, val, min, max):
         if val < min:
+            print("Adust min")
             return min
         elif val > max:
+            print("Adjust max")
             return max
         else:
             return val 
 
 
     def safe_force(self, val):
-        print("Force Adjusted!")
-        self._normalize(val, self.MIN_FORCE, self.MAX_FORCE)
+        return self._normalize(val, self.MIN_FORCE, self.MAX_FORCE)
 
 
     def safe_width(self, val):
-        print("Width Adjusted!")
-        self._normalize(val, self.MIN_WIDTH, self.MAX_WIDTH)
+        return self._normalize(val, self.MIN_WIDTH, self.MAX_WIDTH)
 
 
     def setTimeout(self):
@@ -65,29 +65,28 @@ class PandaGripperInterface():
     def move(self, width, speed):
         # Create goal
         goal = MoveGoal()
-        goal.width = self._safe_width(width)
+        goal.width = self.safe_width(width)
         goal.speed = speed
         # Send goal
-        self._client_homing.send_goal_and_wait(goal, rospy.Duration.from_sec(self._timeout))
+        self._client_move.send_goal_and_wait(goal, rospy.Duration.from_sec(self._timeout))
     
 
     def grasp(self, width, epsilon_inner, epsilon_outer, speed, force):
         # Create goal
         goal = GraspGoal()
-        goal.width = self._safe_width(width)
-        epsilon_inner = epsilon_inner
-        epsilon_outer = epsilon_outer
-        speed = speed
-        force = self.safe_force(force)
+        goal.width = self.safe_width(width)
+        goal.epsilon = GraspEpsilon(epsilon_inner, epsilon_outer)
+        goal.speed = speed
+        goal.force = self.safe_force(force)
         # Send goal
-        self._client_homing.send_goal_and_wait(goal, rospy.Duration.from_sec(self._timeout))
+        self._client_grasp.send_goal_and_wait(goal, rospy.Duration.from_sec(self._timeout))
     
 
     def stop(self):
         # Create goal
         goal = StopGoal()
         # Send goal
-        self._client_homing.send_goal_and_wait(goal, rospy.Duration.from_sec(self._timeout))
+        self._client_stop.send_goal_and_wait(goal, rospy.Duration.from_sec(self._timeout))
 
 
 
@@ -102,9 +101,8 @@ if __name__ == '__main__':
     rospy.sleep(1)
 
     print("PandaGripperInterface.move()")
-    gripper.move(width=0.07, speed=0.1)
+    gripper.move(width=0.05, speed=0.01)
     rospy.sleep(1)
 
     print("PandaGripperInterface.grasp()")
-    gripper.grasp(width=0.07, epsilon_inner=0.02, epsilon_outer=0.02, speed=0.1, force=10)
-    rospy.sleep(1)
+    gripper.grasp(width=0.02, epsilon_inner=0.02, epsilon_outer=0.02, speed=0.01, force=10)
