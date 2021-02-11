@@ -14,7 +14,7 @@ class PandaActor():
         # demo parameters
         self.phase_change_delay = 1  # [sec]
         self.tolerance = 0.005       # [m]
-        self.obj_width = 0.04     # [m]
+        self.obj_width = 0.04        # [m]
         self.enable_real_panda = enable_real_panda
         self.debug_mode = debug_mode
         self.phase = 0  # 1=pre-grasp, 2=grasp, 3=post-grasp
@@ -41,64 +41,60 @@ class PandaActor():
         self.phase = 1
 
         # reset actor and get start pose
-        gym_to_tcp, panda_fingersWidth = self._actor_reset()
-        panda_to_tcp = self.panda_to_gym + gym_to_tcp
+        self.gym_to_tcp, self.panda_fingersWidth = self._actor_reset()
+        self.panda_to_tcp = self.panda_to_gym + self.gym_to_tcp
         self._debugPrint("[gym  ] Goal: {}".format(self.goal.tolist()), 'FG_BLUE')
         self._debugPrint("[panda] Goal: {}\n".format((self.panda_to_gym + self.goal).tolist()), 'FG_BLUE')
 
-        self._debugPrint("[gym  ] Start: {}".format(gym_to_tcp.tolist()   + [panda_fingersWidth]), 'FG_BLUE')
-        self._debugPrint("[panda] Start: {}".format(panda_to_tcp.tolist() + [panda_fingersWidth]), 'FG_BLUE')
+        self._debugPrint("[gym  ] Start: {}".format(self.gym_to_tcp.tolist()   + [self.panda_fingersWidth]), 'FG_BLUE')
+        self._debugPrint("[panda] Start: {}".format(self.panda_to_tcp.tolist() + [self.panda_fingersWidth]), 'FG_BLUE')
 
         if self.enable_real_panda:
             # reset real-panda and get start pose
             real_to_tcp, real_fingersWidth = self._panda_reset()
             self._debugPrint("[real ] Start: {}\n".format(real_to_tcp.tolist() + [real_fingersWidth]), 'FG_WHITE')
 
-            if np.linalg.norm(panda_to_tcp - real_to_tcp) < 0.005:
+            if np.linalg.norm(self.panda_to_tcp - real_to_tcp) < 0.005:
                 print("Check Start Pose: " + colorize("True", 'FG_GREEN_BRIGHT') + "\n")
             else:
                 print("Check Start Pose: " + colorize("False", 'FG_RED_BRIGHT') + "\n")
 
         self._debugPrint("", 'FG_DEFAULT')
-        return gym_to_tcp, panda_fingersWidth
         
 
-    def getAction(self, gym_to_tcp, panda_fingersWidth):
+    def getAction(self):
         # get action
-        action = self._actor_getAction(gym_to_tcp, panda_fingersWidth)
-        target = None
-        self._debugPrint("action: {}".format(action.tolist()), 'FG_MAGENTA')
+        self.action = self._actor_getAction(self.gym_to_tcp, self.panda_fingersWidth)
+        self._debugPrint("action: {}".format(self.action.tolist()), 'FG_MAGENTA')
         # self._debugPrint("[gym  ] Target: {}".format((gym_to_tcp + action[:3]).tolist()), 'FG_BLUE')
-        self._debugPrint("[panda] Target: {}".format((self.panda_to_gym + gym_to_tcp + action[:3]).tolist()), 'FG_BLUE')
-        self._debugPrint("[panda] Target * 0.05: {}".format((self.panda_to_gym + gym_to_tcp + action[:3]*0.05).tolist()), 'FG_BLUE')
+        self._debugPrint("[panda] Target: {}".format((self.panda_to_gym + self.gym_to_tcp + self.action[:3]).tolist()), 'FG_BLUE')
+        self._debugPrint("[panda] Target * 0.05: {}".format((self.panda_to_gym + self.gym_to_tcp + self.action[:3]*0.05).tolist()), 'FG_BLUE')
 
         if self.enable_real_panda:
-            target = self._panda_get_target(self.panda_to_gym + gym_to_tcp, panda_fingersWidth, action)
-            self._debugPrint("[real ] Target: {}".format(target), 'FG_BLUE')
+            self.real_to_target = self._panda_get_target(self.panda_to_gym + self.gym_to_tcp, self.panda_fingersWidth, self.action)
+            self._debugPrint("[real ] Target: {}".format(self.real_to_target), 'FG_BLUE')
 
         self._debugPrint("", 'FG_DEFAULT')
-        return [action, target]
     
     
-    def step(self, action):
+    def step(self):
         # perform a step and get the new current pose
-        gym_to_tcp, panda_fingersWidth = self._actor_step(action[0]) # action
-        panda_to_tcp = self.panda_to_gym + gym_to_tcp
+        self.gym_to_tcp, self.panda_fingersWidth = self._actor_step(self.action)
+        self.panda_to_tcp = self.panda_to_gym + self.gym_to_tcp
         # self._debugPrint("[gym  ] Current: {}".format(gym_to_tcp.tolist()   + [panda_fingersWidth]), 'FG_BLUE')
-        self._debugPrint("[panda] Current: {}".format(panda_to_tcp.tolist() + [panda_fingersWidth]), 'FG_BLUE')
+        self._debugPrint("[panda] Current: {}".format(self.panda_to_tcp.tolist() + [self.panda_fingersWidth]), 'FG_BLUE')
 
         if self.enable_real_panda:
             # move the real robot and get the new current pose
-            real_to_tcp, real_fingersWidth = self._panda_step(action[1]) # new_pose
-            self._debugPrint("[real ] Current: {}\n".format(real_to_tcp.tolist() + [real_fingersWidth]), 'FG_WHITE')
+            real_to_tcp, real_fingersWidth = self._panda_step(self.real_to_target)
+            self._debugPrint("[real ] Current: {}\n".format(real_to_tcp.tolist() + [self.real_fingersWidth]), 'FG_WHITE')
 
-            if np.linalg.norm(panda_to_tcp - real_to_tcp) < 0.005:
+            if np.linalg.norm(self.panda_to_tcp - real_to_tcp) < 0.005:
                 print("Check Current Pose: " + colorize("True", 'FG_GREEN_BRIGHT') + "\n")
             else:
                 print("Check Current Pose: " + colorize("False", 'FG_RED_BRIGHT') + "\n")
 
         self._debugPrint("", 'FG_DEFAULT')
-        return gym_to_tcp, panda_fingersWidth
 
 
     def goalAchived(self):
@@ -153,7 +149,7 @@ class PandaActor():
                 return np.array(action)
             else:
                 self.phase = 2
-                print_col("PRE-GRASP:  successful", 'FG_RED_BRIGHT')
+                print_col("PRE-GRASP: successful", 'FG_YELLOW_BRIGHT')
                 time.sleep(self.phase_change_delay)
 
         # GRASP APPROCH
@@ -167,7 +163,7 @@ class PandaActor():
                 return np.array(action)
             else:
                 self.phase = 3
-                print_col("GRASP:      successful", 'FG_RED_BRIGHT')
+                print_col("GRASP: successful", 'FG_YELLOW_BRIGHT')
                 time.sleep(self.phase_change_delay)
 
         # POST-GRASP RETRACT
@@ -181,7 +177,7 @@ class PandaActor():
                 return np.array(action)
             else:
                 self.phase = 0
-                print_col("POST-GRASP: successful", 'FG_RED_BRIGHT')
+                print_col("POST-GRASP: successful", 'FG_YELLOW_BRIGHT')
                 time.sleep(self.phase_change_delay)
         
         if self.phase == 0: # limit the number of timesteps in the episode to a fixed duration
@@ -281,23 +277,29 @@ def main(NUM_EPISODES, LEN_EPISODE, DEBUG_MODE, ENABLE_REAL_PANDA, HOST, PORT):
 
     for episode in range(NUM_EPISODES):
         # reset actor and get first observations
-        tcp, fingersWidth = my_actor.reset()
+        my_actor.reset()
 
+        goal_achived = False
         for time_step in range(LEN_EPISODE):
             if DEBUG_MODE:
                 print_col("[Step {:>3}]------------------------------------------------".format(time_step), 'FG_GREEN')
             
-            # generate new action
-            action = my_actor.getAction(tcp, fingersWidth)
+            # generate new action from observations
+            my_actor.getAction()
 
-            # perform a step
-            tcp, fingersWidth = my_actor.step(action)
+            # perform a step and get new observations
+            my_actor.step()
 
             # check goal
             if my_actor.goalAchived():
-                print("FINISH IN {} STEPS".format(time_step))
+                goal_achived = True
                 break
+            
         print_col("Episode {} finish".format(episode), 'FG_GREEN')
+        if goal_achived:
+            print_col("Goal achived in {} step".format(time_step), 'FG_GREEN_BRIGHT')
+        else:
+            print_col("Goal not achived in {} step".format(time_step), 'FG_RED_BRIGHT')
 
     print_col("All Episodes finish", 'FG_GREEN')
 
@@ -323,29 +325,3 @@ if __name__ == "__main__":
 
 
     main(NUM_EPISODES, LEN_EPISODE, DEBUG_MODE, ENABLE_REAL_PANDA, HOST, PORT)
-
-
-
-    """
-
-
-    [gym  ] Start: [1.293392652107368, 0.7441233663489732, 0.5969396381996512, 0.0]
-    action: [0.49909391433269557, 0.6565405662477652, -0.4316378291979073, 1.0]
-    [gym  ] Target: [1.7924865664400635, 1.4006639325967385, 0.16530180900174396]
-    [gym  ] Current: [1.310159336108777, 0.7668930256650303, 0.5826742574093213, 0.07027460373514707]
-
-
-
-
-    [panda] Start: [0.601492652107368, 2.336634897326384e-05, 0.29693963819965125, 0.0]
-    action: [0.49909391433269557, 0.6565405662477652, -0.4316378291979073, 1.0]
-    [panda] Target: [1.1005865664400636, 0.6565639325967385, -0.13469819099825603]
-    [panda] Current: [0.6182593361087771, 0.022793025665030275, 0.28267425740932134, 0.07027460373514707]
-
-
-
-    0.6 + 0.56 = 1.16
-
-
-
-    """
