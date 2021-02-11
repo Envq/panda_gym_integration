@@ -276,8 +276,6 @@ class PandaActor():
 
 
 def main(NUM_EPISODES, LEN_EPISODE, DEBUG_MODE, ENABLE_REAL_PANDA, HOST, PORT):
-    """GYM TESTING OFFLINE"""
-
     # initialize Actor
     my_actor = PandaActor(DEBUG_MODE, ENABLE_REAL_PANDA, HOST, PORT)
 
