@@ -15,9 +15,10 @@ class PandaActor():
         self.phase_change_delay = 1  # [sec]
         self.tolerance = 0.005       # [m]
         self.obj_width = 0.04        # [m]
+        self.gripper_move_steps = 10  # [step]
         self.enable_real_panda = enable_real_panda
         self.debug_mode = debug_mode
-        self.phase = 0  # 1=pre-grasp, 2=grasp, 3=post-grasp
+        self.phase = 0  # 1=pre-grasp, 2=grasp, 3=close, 4=place
         self.panda_to_gym = np.array([-0.6919, -0.7441, -0.3]) # [panda -> gym] trasformation
         # self.panda_to_gym = np.array([-0.6918936446121056, -0.7441217819549181, -0.29851902093534083])
         self.offset = 6
@@ -159,11 +160,24 @@ class PandaActor():
                 return np.array(action)
             else:
                 self.phase = 3
+                self.timer = 0
                 print_col("GRASP: successful", 'FG_YELLOW_BRIGHT')
                 time.sleep(self.phase_change_delay)
 
-        # POST-GRASP RETRACT
-        if self.phase == 3:
+        # CLOSE GRIPPER
+        if self.phase == 3: 
+            if self.timer < self.gripper_move_steps:
+                action = [0, 0, 0, -1] # close gripper
+                self.timer += 1
+                return np.array(action)
+            else:
+                self.phase = 4
+                self.timer = 0
+                print_col("GRIPPER CLOSE: successful", 'FG_YELLOW_BRIGHT')
+                time.sleep(self.phase_change_delay)
+
+        # PLACE APPROCH
+        if self.phase == 4:
             if np.linalg.norm(self.goal - gym_to_tcp) >= self.tolerance:
                 action = [0, 0, 0, 0]
                 action[0] = (self.goal[0] - gym_to_tcp[0]) * offset
@@ -302,10 +316,10 @@ if __name__ == "__main__":
     # PARAMETERS
     HOST = "127.0.0.1"
     PORT = 2000
+    DEBUG_MODE = False
     ENABLE_REAL_PANDA = False
     NUM_EPISODES = 1
     LEN_EPISODE = 100
-    DEBUG_MODE = True
     LIMIT_STEP = LEN_EPISODE
 
     if (len(sys.argv) > 1):
