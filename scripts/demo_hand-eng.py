@@ -65,6 +65,7 @@ class PandaActor():
         self.action = self._actor_getAction(self.gym_to_tcp, self.panda_fingersWidth)                           # get action
 
         self._debugPrint("action: {}".format(self.action.tolist()), 'FG_MAGENTA')
+        # print_col("action final: {}".format((self.action * 0.05).tolist()), 'FG_MAGENTA')
         # self._debugPrint("[gym  ] Target: {}".format((gym_to_tcp + action[:3]).tolist()), 'FG_BLUE')
         self._debugPrint("[panda] Target: {}".format((self.panda_to_gym + self.gym_to_tcp + self.action[:3]).tolist()), 'FG_BLUE')
         self._debugPrint("[panda] Target final: {}".format((self.panda_to_gym + self.gym_to_tcp + self.action[:3]*0.05).tolist()), 'FG_BLUE')
@@ -317,7 +318,7 @@ if __name__ == "__main__":
     HOST = "127.0.0.1"
     PORT = 2000
     DEBUG_MODE = True
-    RENDER = False
+    RENDER = True
     ENABLE_REAL_PANDA = False
     NUM_EPISODES = 1
     LEN_EPISODE = 100
