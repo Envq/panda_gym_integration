@@ -320,12 +320,11 @@ if __name__ == "__main__":
     # PARAMETERS
     HOST = "127.0.0.1"
     PORT = 2000
+    NUM_EPISODES = 1
+    LEN_EPISODE = 100
     DEBUG_MODE = True
     RENDER = True
     ENABLE_REAL_PANDA = False
-    NUM_EPISODES = 1
-    LEN_EPISODE = 100
-    LIMIT_STEP = LEN_EPISODE
 
     if (len(sys.argv) > 1):
         if sys.argv[1] == 'real':

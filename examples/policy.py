@@ -128,10 +128,9 @@ if __name__ == "__main__":
     # PARAMETERS
     HOST = "127.0.0.1"
     PORT = 2000
-    DEBUG_MODE = False
     NUM_EPISODES = 1
     LEN_EPISODE = 100
-    LIMIT_STEP = LEN_EPISODE
+    DEBUG_MODE = False
 
     if (len(sys.argv) > 1):
         if sys.argv[1] == 'debug':
