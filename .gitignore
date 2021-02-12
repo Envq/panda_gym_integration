@@ -52,8 +52,7 @@ CATKIN_IGNORE
 
 
 **/__pycache__/
-examples/
-example/
-scripts/panda_gym
-hand-eng.py
+examples/panda_gym
+
 demo-ai/
+demo/

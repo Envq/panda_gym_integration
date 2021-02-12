@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 
+import sys
+sys.path.append("../scripts/")
+
 from src.panda_server import PandaInterface
 from src.colors import print_col, colorize
-import gym, panda_gym
+import gym
 import numpy as np
 import time
-import sys
+import panda_gym
 
 
 class PandaActor():
@@ -111,7 +114,7 @@ class PandaActor():
     """ACTOR BEHAVIOUR"""
     def _actor_init(self, scenario, render):
         # create gym environment
-        self.env = gym.make(scenario, render)
+        self.env = gym.make(scenario, render=render)
 
         
     def _actor_reset(self):

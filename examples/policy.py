@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
+import sys
+sys.path.append("../scripts/")
+
 from src.panda_server import PandaInterface
 from src.colors import print_col, colorize
 import numpy as np
-import sys
 
 
 
