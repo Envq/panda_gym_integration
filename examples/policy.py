@@ -11,9 +11,9 @@ import numpy as np
 
 class PandaActor():
     """GLOBAL BEHAVIOUR"""
-    def __init__(self, debug_mode, HOST, PORT):
+    def __init__(self, DEBUG_ENABLED, HOST, PORT):
         # demo parameters
-        self.debug_mode = debug_mode
+        self.debug_enabled = DEBUG_ENABLED
         self.tolerance = 0.005     # [m]
         self.timer = 0
 
@@ -22,8 +22,8 @@ class PandaActor():
         self.panda.getCurrentState() # get panda-client connection
     
     
-    def _debugPrint(self, msg, color):
-        if self.debug_mode: 
+    def _debugPrint(self, msg, color='FG_DEFAULT'):
+        if self.debug_enabled: 
             print_col(msg, color)
 
 
@@ -49,7 +49,7 @@ class PandaActor():
         self.current_pose = np.array(current_msg[:7])
         self.current_gripper = current_msg[7] # fingers width
 
-        self._debugPrint("[real] Start: {}".format(self.current_pose.tolist() + [self.current_gripper]), 'FG_BLUE')
+        self._debugPrint("[real] Start: {}\n".format(self.current_pose.tolist() + [self.current_gripper]), 'FG_BLUE')
         
 
     def getAction(self):
@@ -81,6 +81,7 @@ class PandaActor():
         self.current_gripper = current_msg[7] # fingers width
 
         self._debugPrint("[real] Current: {}".format(self.current_pose.tolist() + [self.current_gripper]), 'FG_BLUE')
+        self._debugPrint("")
 
 
     def __del__(self):
@@ -89,9 +90,9 @@ class PandaActor():
 
 
 
-def main(NUM_EPISODES, LEN_EPISODE, DEBUG_MODE, HOST, PORT):
+def main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENABLED, HOST, PORT):
     # initialize Actor
-    my_actor = PandaActor(DEBUG_MODE, HOST, PORT)
+    my_actor = PandaActor(DEBUG_ENABLED, HOST, PORT)
 
     for episode in range(NUM_EPISODES):
         # reset actor and get first observations
@@ -99,7 +100,7 @@ def main(NUM_EPISODES, LEN_EPISODE, DEBUG_MODE, HOST, PORT):
 
         goal_achived = False
         for time_step in range(LEN_EPISODE):
-            if DEBUG_MODE:
+            if DEBUG_ENABLED:
                 print_col("[Step {:>3}]------------------------------------------------".format(time_step), 'FG_GREEN')
             
             # generate new action from observations
@@ -130,14 +131,14 @@ if __name__ == "__main__":
     PORT = 2000
     NUM_EPISODES = 1
     LEN_EPISODE = 100
-    DEBUG_MODE = False
+    DEBUG_ENABLED = False
 
     if (len(sys.argv) > 1):
         if sys.argv[1] == 'debug':
-            DEBUG_MODE = True
+            DEBUG_ENABLED = True
 
         if len(sys.argv) > 2:
             LEN_EPISODE = int(sys.argv[2])
 
 
-    main(NUM_EPISODES, LEN_EPISODE, DEBUG_MODE, HOST, PORT)
+    main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENABLED, HOST, PORT)

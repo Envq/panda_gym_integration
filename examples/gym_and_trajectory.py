@@ -13,10 +13,10 @@ import panda_gym
 
 class PandaActor():
     """GLOBAL BEHAVIOUR"""
-    def __init__(self, debug_mode, render, enable_real_panda, HOST, PORT):
+    def __init__(self, DEBUG_ENABLED, render, enable_real_panda, HOST, PORT):
         # demo parameters
         self.enable_real_panda = enable_real_panda
-        self.debug_mode = debug_mode
+        self.debug_enabled = DEBUG_ENABLED
         self.panda_to_gym = np.array([-0.6919, -0.7441, -0.3]) # [panda -> gym] trasformation
         # self.panda_to_gym = np.array([-0.6918936446121056, -0.7441217819549181, -0.29851902093534083])
         self.tolerance = 0.005        # [m]
@@ -37,8 +37,8 @@ class PandaActor():
         self._debugPrint("panda -> gym: {}".format(self.panda_to_gym.tolist()), 'FG_BLUE')
     
     
-    def _debugPrint(self, msg, color):
-        if self.debug_mode: 
+    def _debugPrint(self, msg, color='FG_DEFAULT'):
+        if self.debug_enabled: 
             print_col(msg, color)
     
 
@@ -62,10 +62,10 @@ class PandaActor():
             
             self._debugPrint("[real ] Start: {}\n".format(self.real_to_tcp.tolist() + [self.real_fingersWidth]), 'FG_WHITE')
             if np.linalg.norm(self.panda_to_tcp - self.real_to_tcp) < self.tolerance:
-                print("Check Start Pose: " + colorize("True", 'FG_GREEN_BRIGHT') + "\n")
+                self._debugPrint("Check Start Pose: {}\n".format(colorize("True", 'FG_GREEN_BRIGHT')))
             else:
-                print("Check Start Pose: " + colorize("False", 'FG_RED_BRIGHT') + "\n")
-        self._debugPrint("", 'FG_DEFAULT')
+                self._debugPrint("Check Start Pose: {}\n".format(colorize("False", 'FG_RED_BRIGHT')))
+        self._debugPrint("")
         
 
     def getAction(self):
@@ -82,7 +82,7 @@ class PandaActor():
             self.real_to_target = self._panda_get_target(self.panda_to_tcp, self.actor_fingersWidth, self.action)  # get target pose
             
             self._debugPrint("[real ] Target: {}".format(self.real_to_target), 'FG_BLUE')
-        self._debugPrint("", 'FG_DEFAULT')
+        self._debugPrint("")
     
     
     def step(self):
@@ -97,10 +97,10 @@ class PandaActor():
             
             self._debugPrint("[real ] Current: {}\n".format( self.real_to_tcp.tolist() + [self.real_fingersWidth]), 'FG_WHITE')
             if np.linalg.norm(self.panda_to_tcp -  self.real_to_tcp) < self.tolerance:
-                print("Check Current Pose: " + colorize("True", 'FG_GREEN_BRIGHT') + "\n")
+                self._debugPrint("Check Current Pose: {}\n".format(colorize("True", 'FG_GREEN_BRIGHT')))
             else:
-                print("Check Current Pose: " + colorize("False", 'FG_RED_BRIGHT') + "\n")
-        self._debugPrint("", 'FG_DEFAULT')
+                self._debugPrint("Check Current Pose: {}\n".format(colorize("False", 'FG_RED_BRIGHT')))
+        self._debugPrint("")
 
 
     def __del__(self):
@@ -281,9 +281,9 @@ class PandaActor():
 
 
 
-def main(NUM_EPISODES, LEN_EPISODE, DEBUG_MODE, RENDER, ENABLE_REAL_PANDA, HOST, PORT):
+def main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENABLED, RENDER, ENABLE_REAL_PANDA, HOST, PORT):
     # initialize Actor
-    my_actor = PandaActor(DEBUG_MODE, RENDER, ENABLE_REAL_PANDA, HOST, PORT)
+    my_actor = PandaActor(DEBUG_ENABLED, RENDER, ENABLE_REAL_PANDA, HOST, PORT)
 
     for episode in range(NUM_EPISODES):
         # reset actor and get first observations
@@ -291,7 +291,7 @@ def main(NUM_EPISODES, LEN_EPISODE, DEBUG_MODE, RENDER, ENABLE_REAL_PANDA, HOST,
 
         goal_achived = False
         for time_step in range(LEN_EPISODE):
-            if DEBUG_MODE:
+            if DEBUG_ENABLED:
                 print_col("[Step {:>3}]------------------------------------------------".format(time_step), 'FG_GREEN')
             
             # generate new action from observations
@@ -322,7 +322,7 @@ if __name__ == "__main__":
     PORT = 2000
     NUM_EPISODES = 1
     LEN_EPISODE = 100
-    DEBUG_MODE = True
+    DEBUG_ENABLED = True
     RENDER = True
     ENABLE_REAL_PANDA = False
 
@@ -334,4 +334,4 @@ if __name__ == "__main__":
             LEN_EPISODE = int(sys.argv[2])
 
 
-    main(NUM_EPISODES, LEN_EPISODE, DEBUG_MODE, RENDER, ENABLE_REAL_PANDA, HOST, PORT)
+    main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENABLED, RENDER, ENABLE_REAL_PANDA, HOST, PORT)

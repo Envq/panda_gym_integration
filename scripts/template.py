@@ -25,7 +25,7 @@ class PandaActor():
         self.panda.getCurrentState() # get panda-client connection
     
     
-    def _debugPrint(self, msg, color):
+    def _debugPrint(self, msg, color='FG_DEFAULT'):
         if self.debug_mode: 
             print_col(msg, color)
 
