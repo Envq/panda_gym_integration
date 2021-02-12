@@ -27,11 +27,11 @@ class PandaActor():
         self.offset = 6 # decrease this value to increase the points of the trajectory
 
         # initialize
-        self._actor_init(scenario="PandaPickAndPlace-v0", render=render)
+        self._gym_init(scenario="PandaPickAndPlace-v0", render=render)
 
         if self.enable_real_panda:
             print_col("==================================================", 'FG_GREEN')
-            self._panda_init(HOST, PORT)
+            self._robot_init(HOST, PORT)
             print_col("==================================================", 'FG_GREEN')
         
         self._debugPrint("panda -> gym: {}".format(self.panda_to_gym.tolist()), 'FG_BLUE')
@@ -48,7 +48,7 @@ class PandaActor():
     
     def reset(self):
         self.phase = 1                                                      # select first phase
-        self.gym_to_tcp, self.actor_fingersWidth = self._actor_reset()      # reset actor and get start pose
+        self.gym_to_tcp, self.actor_fingersWidth = self._gym_reset()      # reset actor and get start pose
         self.panda_to_tcp = self.panda_to_gym + self.gym_to_tcp             # update panda_to_tcp
         
         self._debugPrint("[gym  ] Goal: {}".format(self.goal.tolist()), 'FG_BLUE')
@@ -58,7 +58,7 @@ class PandaActor():
         self._debugPrint("[panda] Start: {}".format(self.panda_to_tcp.tolist() + [self.actor_fingersWidth]), 'FG_BLUE')
 
         if self.enable_real_panda:
-            self.real_to_tcp, self.real_fingersWidth = self._panda_reset()            # reset real-panda and get start pose
+            self.real_to_tcp, self.real_fingersWidth = self._robot_reset()            # reset real-panda and get start pose
             
             self._debugPrint("[real ] Start: {}\n".format(self.real_to_tcp.tolist() + [self.real_fingersWidth]), 'FG_WHITE')
             if np.linalg.norm(self.panda_to_tcp - self.real_to_tcp) < self.tolerance:
@@ -69,7 +69,7 @@ class PandaActor():
         
 
     def getAction(self):
-        self.action = self._actor_getAction(self.gym_to_tcp, self.actor_fingersWidth)                           # get action
+        self.action = self._gym_getAction(self.gym_to_tcp, self.actor_fingersWidth)                           # get action
 
         self._debugPrint("action: {}".format(self.action.tolist()), 'FG_MAGENTA')
         # print_col("action final: {}".format((self.action * 0.05).tolist()), 'FG_MAGENTA')
@@ -79,21 +79,21 @@ class PandaActor():
 
         if self.enable_real_panda:
             # Note: here I use panda_to_tcp to reduce the error between panda_gym and moveit caused by not reaching the target_pose after one step
-            self.real_to_target = self._panda_get_target(self.panda_to_tcp, self.actor_fingersWidth, self.action)  # get target pose
+            self.real_to_target = self._robot_get_target(self.panda_to_tcp, self.actor_fingersWidth, self.action)  # get target pose
             
             self._debugPrint("[real ] Target: {}".format(self.real_to_target), 'FG_BLUE')
         self._debugPrint("")
     
     
     def step(self):
-        self.gym_to_tcp, self.actor_fingersWidth = self._actor_step(self.action)            # perform a step and get the new current pose
+        self.gym_to_tcp, self.actor_fingersWidth = self._gym_step(self.action)            # perform a step and get the new current pose
         self.panda_to_tcp = self.panda_to_gym + self.gym_to_tcp                             # update panda_to_tcp
         
         # self._debugPrint("[gym  ] Current: {}".format(self.gym_to_tcp.tolist()   + [self.actor_fingersWidth]), 'FG_BLUE')
         self._debugPrint("[panda] Current: {}".format(self.panda_to_tcp.tolist() + [self.actor_fingersWidth]), 'FG_BLUE')
 
         if self.enable_real_panda:
-            self.real_to_tcp,  self.real_fingersWidth = self._panda_step(self.real_to_target) # move real-panda and get the new current pose
+            self.real_to_tcp,  self.real_fingersWidth = self._robot_step(self.real_to_target) # move real-panda and get the new current pose
             
             self._debugPrint("[real ] Current: {}\n".format( self.real_to_tcp.tolist() + [self.real_fingersWidth]), 'FG_WHITE')
             if np.linalg.norm(self.panda_to_tcp -  self.real_to_tcp) < self.tolerance:
@@ -104,20 +104,20 @@ class PandaActor():
 
 
     def __del__(self):
-        self._actor_del()
+        self._gym_del()
 
         if self.enable_real_panda:
             print_col("close communication", 'FG_MAGENTA')
-            self._panda_del()
+            self._robot_del()
 
     
-    """ACTOR BEHAVIOUR"""
-    def _actor_init(self, scenario, render):
+    """GYM BEHAVIOUR"""
+    def _gym_init(self, scenario, render):
         # create gym environment
         self.env = gym.make(scenario, render=render)
 
         
-    def _actor_reset(self):
+    def _gym_reset(self):
         # start to do the demo
         observation = self.env.reset()
 
@@ -136,7 +136,7 @@ class PandaActor():
         return gym_to_tcp, fingersWidth
         
 
-    def _actor_getAction(self, gym_to_tcp, actor_fingersWidth):
+    def _gym_getAction(self, gym_to_tcp, actor_fingersWidth):
         # SETTINGS
         self.env.render()
         offset = self.offset 
@@ -201,7 +201,7 @@ class PandaActor():
             return np.array(action)
 
 
-    def _actor_step(self, action):
+    def _gym_step(self, action):
         # put actions into the environment and get observations
         observation, reward, done, info = self.env.step(action)
         finger0 = observation["observation"][9]
@@ -211,18 +211,18 @@ class PandaActor():
         return gym_to_tcp, fingersWidth
     
 
-    def _actor_del(self):
+    def _gym_del(self):
         # close gym environment
         self.env.close()
     
     
-    """REAL PANDA BEHAVIOUR"""
-    def _panda_init(self, HOST, PORT):
+    """REAL ROBOT BEHAVIOUR"""
+    def _robot_init(self, HOST, PORT):
         self.panda = PandaInterface(HOST, PORT)
         self.panda.getCurrentState() # get panda-client connection
         
 
-    def _panda_reset(self):
+    def _robot_reset(self):
         # Go to the start pose
         # j -0.001816946231006284 0.18395769805291534 0.0019670806476780292 -1.9086118257739941 -0.000429905939813149 2.095203423532922 0.7857393046819857 0.0
         real_to_start = [0.6014990053878944, 1.5880450818915202e-06, 0.29842061906465916, -3.8623752044513406e-06, -0.0013073068882995874, -5.91084615330739e-06, 0.9999991454490569, 0.08, 0] # Start pose gym
@@ -240,7 +240,7 @@ class PandaActor():
         return np.array(current_pose[:3]), current_pose[3]
         
 
-    def _panda_get_target(self, real_to_tcp, real_fingersWidth, action):
+    def _robot_get_target(self, real_to_tcp, real_fingersWidth, action):
         # Perform action with real robot: real_to_tcp -> tcp_to_target
         offset = self.offset 
         variation = 0.05 # This is the correction of pos_ctrl in line 81 panda_env.py in panda_gym
@@ -259,7 +259,7 @@ class PandaActor():
         return real_to_target
     
 
-    def _panda_step(self, real_to_target):
+    def _robot_step(self, real_to_target):
         # Send goal 
         self.panda.sendGoalState(real_to_target)
 
@@ -275,7 +275,7 @@ class PandaActor():
         return np.array(current_pose[:3]), current_pose[3]
     
 
-    def _panda_del(self):
+    def _robot_del(self):
         # Close communication
         self.panda.sendClose()
 
