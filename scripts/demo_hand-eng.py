@@ -10,26 +10,27 @@ import sys
 
 class PandaActor():
     """PUBLIC INTERFACE"""
-    def __init__(self, debug_mode, enable_real_panda, HOST, PORT):
+    def __init__(self, debug_mode, render, enable_real_panda, HOST, PORT):
         # demo parameters
-        self.phase_change_delay = 1  # [sec]
-        self.tolerance = 0.005       # [m]
-        self.obj_width = 0.04        # [m]
-        self.gripper_move_steps = 10  # [step]
         self.enable_real_panda = enable_real_panda
         self.debug_mode = debug_mode
+        self.phase_change_delay = 1   # [sec]
+        self.tolerance = 0.005        # [m]
+        self.obj_width = 0.04         # [m]
+        self.gripper_move_steps = 10  # [step]
         self.phase = 0  # 1=pre-grasp, 2=grasp, 3=close, 4=place
         self.panda_to_gym = np.array([-0.6919, -0.7441, -0.3]) # [panda -> gym] trasformation
         # self.panda_to_gym = np.array([-0.6918936446121056, -0.7441217819549181, -0.29851902093534083])
         self.offset = 6
 
         # initialize
-        self._actor_init(render=True)
+        self._actor_init(render=render)
 
         if self.enable_real_panda:
             print_col("==================================================", 'FG_GREEN')
             self._panda_init(HOST, PORT)
             print_col("==================================================", 'FG_GREEN')
+        
         self._debugPrint("panda -> gym: {}".format(self.panda_to_gym.tolist()), 'FG_BLUE')
     
     
@@ -66,10 +67,11 @@ class PandaActor():
         self._debugPrint("action: {}".format(self.action.tolist()), 'FG_MAGENTA')
         # self._debugPrint("[gym  ] Target: {}".format((gym_to_tcp + action[:3]).tolist()), 'FG_BLUE')
         self._debugPrint("[panda] Target: {}".format((self.panda_to_gym + self.gym_to_tcp + self.action[:3]).tolist()), 'FG_BLUE')
-        self._debugPrint("[panda] Target * 0.05: {}".format((self.panda_to_gym + self.gym_to_tcp + self.action[:3]*0.05).tolist()), 'FG_BLUE')
+        self._debugPrint("[panda] Target final: {}".format((self.panda_to_gym + self.gym_to_tcp + self.action[:3]*0.05).tolist()), 'FG_BLUE')
 
         if self.enable_real_panda:
-            self.real_to_target = self._panda_get_target(self.real_to_tcp, self.panda_fingersWidth, self.action)  # get target pose
+            # Note: here I use panda_to_tcp to reduce the error between panda_gym and moveit caused by not reaching the target_pose after one step
+            self.real_to_target = self._panda_get_target(self.panda_to_tcp, self.panda_fingersWidth, self.action)  # get target pose
             
             self._debugPrint("[real ] Target: {}".format(self.real_to_target), 'FG_BLUE')
         self._debugPrint("", 'FG_DEFAULT')
@@ -275,9 +277,9 @@ class PandaActor():
 
 
 
-def main(NUM_EPISODES, LEN_EPISODE, DEBUG_MODE, ENABLE_REAL_PANDA, HOST, PORT):
+def main(NUM_EPISODES, LEN_EPISODE, DEBUG_MODE, RENDER, ENABLE_REAL_PANDA, HOST, PORT):
     # initialize Actor
-    my_actor = PandaActor(DEBUG_MODE, ENABLE_REAL_PANDA, HOST, PORT)
+    my_actor = PandaActor(DEBUG_MODE, RENDER, ENABLE_REAL_PANDA, HOST, PORT)
 
     for episode in range(NUM_EPISODES):
         # reset actor and get first observations
@@ -314,7 +316,8 @@ if __name__ == "__main__":
     # PARAMETERS
     HOST = "127.0.0.1"
     PORT = 2000
-    DEBUG_MODE = False
+    DEBUG_MODE = True
+    RENDER = False
     ENABLE_REAL_PANDA = False
     NUM_EPISODES = 1
     LEN_EPISODE = 100
@@ -328,4 +331,4 @@ if __name__ == "__main__":
             LEN_EPISODE = int(sys.argv[2])
 
 
-    main(NUM_EPISODES, LEN_EPISODE, DEBUG_MODE, ENABLE_REAL_PANDA, HOST, PORT)
+    main(NUM_EPISODES, LEN_EPISODE, DEBUG_MODE, RENDER, ENABLE_REAL_PANDA, HOST, PORT)
