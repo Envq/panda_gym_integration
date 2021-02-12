@@ -21,7 +21,7 @@ class PandaActor():
         self.obj_width = 0.04         # [m]
         self.gripper_move_steps = 10  # [step]
         self.phase = 0  # 1=pre-grasp, 2=grasp, 3=close, 4=place
-        self.offset = 6
+        self.offset = 6 # decrease this value to increase the points of the trajectory
 
         # initialize
         self._actor_init(scenario="PandaPickAndPlace-v0", render=render)
@@ -38,6 +38,10 @@ class PandaActor():
         if self.debug_mode: 
             print_col(msg, color)
     
+
+    def goalAchieved(self):
+        return self.phase == 0
+
     
     def reset(self):
         self.phase = 1                                                      # select first phase
@@ -94,10 +98,6 @@ class PandaActor():
             else:
                 print("Check Current Pose: " + colorize("False", 'FG_RED_BRIGHT') + "\n")
         self._debugPrint("", 'FG_DEFAULT')
-
-
-    def goalAchieved(self):
-        return self.phase == 0
 
 
     def __del__(self):

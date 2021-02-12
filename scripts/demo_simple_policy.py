@@ -2,7 +2,6 @@
 
 from src.panda_server import PandaInterface
 from src.colors import print_col, colorize
-import gym, panda_gym
 import numpy as np
 import sys
 
@@ -11,14 +10,10 @@ import sys
 class PandaActor():
     """GLOBAL BEHAVIOUR"""
     def __init__(self, debug_mode, HOST, PORT):
-        """
-        Edit this with your custom attributes and initializations
-        """
         # demo parameters
         self.debug_mode = debug_mode
-        #current_msg -> Position(x, y, z)  Orientation(x, y, z , w)  Fingers(width)
-        #target_msg  -> Position(x, y, z)  Orientation(x, y, z , w)  Fingers(width)  Grasp
-        #goal_pose   -> Position(x, y, z)  Orientation(x, y, z , w)
+        self.tolerance = 0.005     # [m]
+        self.timer = 0
 
         # initialize
         self.panda = PandaInterface(HOST, PORT)
@@ -31,20 +26,15 @@ class PandaActor():
 
 
     def goalAchieved(self):
-        """
-        Edit this with your goal achived control
-        """
-        # return np.linalg.norm(self.goal_pose - self.current_pose) < 0.05
+        return np.linalg.norm(self.goal_pose - self.current_pose) < self.tolerance
     
     
     def reset(self):
-        """
-        Edit this with goal and start msg and do first observations
-        """
-        self.goal_pose = np.zeros(7) #Initialize this...
-        print_col("[real] Goal: {}".format(self.goal_pose.tolist()), 'FG_MAGENTA')
+        start_msg = [0.3, 0.0, 0.6,  0.0, 0.0, 0.0, 1.0,  0.08, 0]
+        self.goal_pose = np.array(start_msg[:7])
+        self.goal_pose[0] -= 0.1
 
-        start_msg = list() #Initialize this...
+        print_col("[real] Goal: {}".format(self.goal_pose.tolist()), 'FG_MAGENTA')
 
         self.panda.sendGoalState(start_msg) 
         current_msg = self.panda.getCurrentState()
@@ -61,20 +51,21 @@ class PandaActor():
         
 
     def getAction(self):
-        """
-        Edit this with your methods for generate target for real robot
-        """
-        #self.target_pose = self.current_pose + ...
-        #self.target_gripper = ...
-        #self.grasp = ...
+        self.target_pose = self.current_pose.copy()
+        if self.timer < 5:
+            self.target_pose[0] += 0.01
+        else:
+            self.target_pose[0] -= 0.01
+        self.target_gripper = self.current_gripper
+
+        self._debugPrint("[real] Target: {}".format(self.target_pose.tolist() + [self.target_gripper]), 'FG_BLUE')
     
     
     def step(self):
-        """
-        Edit this with your methods for generate target for real robot
-        """
+        self.timer += 1
+
         # Send goal
-        msg = self.panda.sendGoalState(self.target_pose.tolist() + [self.target_gripper, self.grasp])
+        self.panda.sendGoalState(self.target_pose.tolist() + [self.target_gripper, 0]) # gripper_open
 
         # Get current pose and gripper state of Panda
         current_msg = self.panda.getCurrentState()
@@ -87,13 +78,10 @@ class PandaActor():
         self.current_pose = np.array(current_msg[:7])
         self.current_gripper = current_msg[7] # fingers width
 
-        self._debugPrint("[real] Start: {}".format(self.current_pose.tolist() + [self.current_gripper]), 'FG_BLUE')
+        self._debugPrint("[real] Current: {}".format(self.current_pose.tolist() + [self.current_gripper]), 'FG_BLUE')
 
 
     def __del__(self):
-        """
-        Edit this with your destructors
-        """
         print_col("close communication", 'FG_MAGENTA')
         self.panda.sendClose()
 
@@ -138,14 +126,14 @@ if __name__ == "__main__":
     # PARAMETERS
     HOST = "127.0.0.1"
     PORT = 2000
-    DEBUG_MODE = True
+    DEBUG_MODE = False
     NUM_EPISODES = 1
     LEN_EPISODE = 100
     LIMIT_STEP = LEN_EPISODE
 
     if (len(sys.argv) > 1):
-        if sys.argv[1] == 'real':
-            ENABLE_REAL_PANDA = True
+        if sys.argv[1] == 'debug':
+            DEBUG_MODE = True
 
         if len(sys.argv) > 2:
             LEN_EPISODE = int(sys.argv[2])
