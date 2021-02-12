@@ -8,20 +8,36 @@ import time
 import sys
 
 
+"""
+TO DO PandaActor with:
+- __init__()            -> manage your variables
+- reset()               -> ad
+- getAction()           -> manage your method of generating action
+- step()                -> manage your method of generation observations
+- goalAchieved()        -> manage your method of controlling the achievement of the goal
+
+- _actor_reset()        -> add custom observations and intermediate goals
+- _actor_getAction()    -> create your policy
+- _actor_step()         -> add custom observations
+
+
+"""
+
+
 class PandaActor():
     """GLOBAL BEHAVIOUR"""
     def __init__(self, debug_mode, render, enable_real_panda, HOST, PORT):
+        """
+
+        edit it with your custom attributes
+
+        """
         # demo parameters
         self.enable_real_panda = enable_real_panda
         self.debug_mode = debug_mode
         self.panda_to_gym = np.array([-0.6919, -0.7441, -0.3]) # [panda -> gym] trasformation
         # self.panda_to_gym = np.array([-0.6918936446121056, -0.7441217819549181, -0.29851902093534083])
         self.tolerance = 0.005        # [m]
-        self.phase_change_delay = 1   # [sec]
-        self.obj_width = 0.04         # [m]
-        self.gripper_move_steps = 10  # [step]
-        self.phase = 0  # 1=pre-grasp, 2=grasp, 3=close, 4=place
-        self.offset = 6
 
         # initialize
         self._actor_init(scenario="PandaPickAndPlace-v0", render=render)
@@ -40,7 +56,11 @@ class PandaActor():
     
     
     def reset(self):
-        self.phase = 1                                                      # select first phase
+        """
+
+        Edit this with reset actions, and debug comments
+
+        """
         self.gym_to_tcp, self.actor_fingersWidth = self._actor_reset()      # reset actor and get start pose
         self.panda_to_tcp = self.panda_to_gym + self.gym_to_tcp             # update panda_to_tcp
         
@@ -62,6 +82,11 @@ class PandaActor():
         
 
     def getAction(self):
+        """
+
+        Edit this with your methods for generate target_pose for real robot
+
+        """
         self.action = self._actor_getAction(self.gym_to_tcp, self.actor_fingersWidth)                           # get action
 
         self._debugPrint("action: {}".format(self.action.tolist()), 'FG_MAGENTA')
@@ -71,14 +96,18 @@ class PandaActor():
         self._debugPrint("[panda] Target final: {}".format((self.panda_to_gym + self.gym_to_tcp + self.action[:3]*0.05).tolist()), 'FG_BLUE')
 
         if self.enable_real_panda:
-            # Note: here I use panda_to_tcp to reduce the error between panda_gym and moveit caused by not reaching the target_pose after one step
-            self.real_to_target = self._panda_get_target(self.panda_to_tcp, self.actor_fingersWidth, self.action)  # get target pose
+            self.real_to_target = self._panda_get_target(self.real_to_tcp, self.real_fingersWidth, self.action)  # get target pose
             
             self._debugPrint("[real ] Target: {}".format(self.real_to_target), 'FG_BLUE')
         self._debugPrint("", 'FG_DEFAULT')
     
     
     def step(self):
+        """
+
+        Edit this with your methods for generate target_pose for real robot
+
+        """
         self.gym_to_tcp, self.actor_fingersWidth = self._actor_step(self.action)            # perform a step and get the new current pose
         self.panda_to_tcp = self.panda_to_gym + self.gym_to_tcp                             # update panda_to_tcp
         
@@ -97,7 +126,13 @@ class PandaActor():
 
 
     def goalAchieved(self):
-        return self.phase == 0
+        """
+
+        Edit this with you goal achived control
+
+        """
+        goalAchieved = False
+        return goalAchieved
 
 
     def __del__(self):
@@ -117,14 +152,11 @@ class PandaActor():
     def _actor_reset(self):
         # start to do the demo
         observation = self.env.reset()
+        """
 
-        # get immutable informations
-        self.gym_to_objOnStart = observation["observation"][3:6]   # object_pos
-        self.goal = observation["desired_goal"]
+        edit with for add custom observations and intermediate goals (pre_grasp_pose, object_pose ecc)
 
-        self.pre_grasp_goal = self.gym_to_objOnStart.copy()
-        self.pre_grasp_goal[2] += 0.10  # [m] above the obj
-
+        """
         # Get and return observations (tcp + gripper width)
         finger0 = observation["observation"][9]
         finger1 = observation["observation"][10]
@@ -136,71 +168,23 @@ class PandaActor():
     def _actor_getAction(self, gym_to_tcp, actor_fingersWidth):
         # SETTINGS
         self.env.render()
-        offset = self.offset 
-
-        # PRE-GRASP APPROCH
-        if self.phase == 1:
-            if np.linalg.norm(self.pre_grasp_goal - gym_to_tcp) >= self.tolerance:
-                action = [0, 0, 0, 0]
-                action[0] = (self.pre_grasp_goal[0] - gym_to_tcp[0]) * offset
-                action[1] = (self.pre_grasp_goal[1] - gym_to_tcp[1]) * offset
-                action[2] = (self.pre_grasp_goal[2] - gym_to_tcp[2]) * offset
-                action[3] = 1 # open gripper
-                return np.array(action)
-            else:
-                self.phase = 2
-                print_col("PRE-GRASP: successful", 'FG_YELLOW_BRIGHT')
-                time.sleep(self.phase_change_delay)
-
-        # GRASP APPROCH
-        if self.phase == 2: 
-            if np.linalg.norm(self.gym_to_objOnStart - gym_to_tcp) >= self.tolerance: 
-                action = [0, 0, 0, 0]
-                action[0] = (self.gym_to_objOnStart[0] - gym_to_tcp[0]) * offset
-                action[1] = (self.gym_to_objOnStart[1] - gym_to_tcp[1]) * offset
-                action[2] = (self.gym_to_objOnStart[2] - gym_to_tcp[2]) * offset
-                action[3] = 1 # open gripper
-                return np.array(action)
-            else:
-                self.phase = 3
-                self.timer = 0
-                print_col("GRASP: successful", 'FG_YELLOW_BRIGHT')
-                time.sleep(self.phase_change_delay)
-
-        # CLOSE GRIPPER
-        if self.phase == 3: 
-            if self.timer < self.gripper_move_steps:
-                action = [0, 0, 0, -1] # close gripper
-                self.timer += 1
-                return np.array(action)
-            else:
-                self.phase = 4
-                self.timer = 0
-                print_col("GRIPPER CLOSE: successful", 'FG_YELLOW_BRIGHT')
-                time.sleep(self.phase_change_delay)
-
-        # PLACE APPROCH
-        if self.phase == 4:
-            if np.linalg.norm(self.goal - gym_to_tcp) >= self.tolerance:
-                action = [0, 0, 0, 0]
-                action[0] = (self.goal[0] - gym_to_tcp[0]) * offset
-                action[1] = (self.goal[1] - gym_to_tcp[1]) * offset
-                action[2] = (self.goal[2] - gym_to_tcp[2]) * offset
-                action[3] = -1 # close gripper
-                return np.array(action)
-            else:
-                self.phase = 0
-                print_col("POST-GRASP: successful", 'FG_YELLOW_BRIGHT')
-                time.sleep(self.phase_change_delay)
+        """
         
-        if self.phase == 0: # limit the number of timesteps in the episode to a fixed duration
-            action = [0, 0, 0, -1] # close gripper
-            return np.array(action)
+        Edit this with your policy
+
+        """
+        action = [0, 0, 0, -1] # close gripper
+        return np.array(action)
 
 
     def _actor_step(self, action):
         # put actions into the environment and get observations
         observation, reward, done, info = self.env.step(action)
+        """
+
+        edit with for add custom observations
+
+        """
         finger0 = observation["observation"][9]
         finger1 = observation["observation"][10]
         fingersWidth = finger0 + finger1
@@ -239,12 +223,11 @@ class PandaActor():
 
     def _panda_get_target(self, real_to_tcp, real_fingersWidth, action):
         # Perform action with real robot: real_to_tcp -> tcp_to_target
-        offset = self.offset 
         variation = 0.05 # This is the correction of pos_ctrl in line 81 panda_env.py in panda_gym
 
-        x = real_to_tcp[0] + ((action[0] / offset) * variation)
-        y = real_to_tcp[1] + ((action[1] / offset) * variation)
-        z = real_to_tcp[2] + ((action[2] / offset) * variation)
+        x = real_to_tcp[0] + (action[0] * variation)
+        y = real_to_tcp[1] + (action[1] * variation)
+        z = real_to_tcp[2] + (action[2] * variation)
         if action[3] < 0:
             grip = self.obj_width    # gripper close to obj
             grasp = 1
