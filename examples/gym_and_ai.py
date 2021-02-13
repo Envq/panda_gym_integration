@@ -44,8 +44,8 @@ class PandaActor():
         self.phase_change_delay = 1   # [sec]
         self.obj_width = 0.04         # [m]
         self.gripper_move_steps = 10  # [step]
+        self.gripper_step = 0
         self.phase = 0  # 1=pre-grasp, 2=grasp, 3=close, 4=place
-        self.offset = 6 # decrease this value to increase the points of the trajectory
 
         # initialize
         if MODE == "real":
@@ -63,13 +63,12 @@ class PandaActor():
 
 
     def goalAchieved(self):
-        if MODE == "real":
-            return np.linalg.norm(self.goal_pose - self.current_pose) < self.tolerance
-        else:
-            return False
+        return self.phase == 0
     
     
     def reset(self):
+        self.phase = 1  
+
         if MODE == "real":
             self._robot_reset()
             self._debugPrint("[real ] goal: {}\n".format((self.goal_pose).tolist()), 'FG_MAGENTA')
@@ -85,17 +84,24 @@ class PandaActor():
         self._debugPrint("")
 
         
-    def getAction(self, time_step):
+    def getAction(self):
+        # Generate action with policy
+        self.policy2()
+        self._debugPrint("action: {}".format(self.action.tolist()), 'FG_MAGENTA')
+        print_col("action final: {}\n".format(np.append(self.action[:3]*0.05, self.action[3:]).tolist()), 'FG_MAGENTA')
+        # target_pose_tmp = transform2(self.current_pose, self.action[:7])
+        self.target_pose = transform2(self.current_pose, np.append(self.action[:3]*0.05, self.action[3:7]))
+        self.target_gripper = self.obj_width if self.action[7] < 0 else 0.08
+
         if MODE == "real":
-            self._robot_getAction(time_step)
-            self._debugPrint("[real ] Target: {}".format(self.target_pose.tolist()), 'FG_BLUE')
+            # self._debugPrint("[real ] Target: {}".format(target_pose_tmp.tolist()), 'FG_WHITE')
+            self._debugPrint("[real ] Target final: {}".format(self.target_pose.tolist()), 'FG_WHITE')
         elif MODE == "sim":
-            self._gym_getAction()
-            self._debugPrint("action: {}".format(self.action.tolist()), 'FG_MAGENTA')
-            print_col("action final: {}\n".format(np.append(self.action[:3]*0.05, self.action[3:]).tolist()), 'FG_MAGENTA')
-                    
-            self._debugPrint("[panda] Target: {}".format(transform3(self.panda_to_gym, self.current_pose, self.action[:7]).tolist()), 'FG_BLUE')
-            self._debugPrint("[panda] Target final: {}".format(transform3(self.panda_to_gym, self.current_pose, np.append(self.action[:3]*0.05, self.action[3:7])).tolist()), 'FG_BLUE')
+            self.env.render()
+            # target_pose_tmp = transform2(self.panda_to_gym, target_pose_tmp)
+            self.target_pose = transform2(self.panda_to_gym, self.target_pose)
+            # self._debugPrint("[panda] Target: {}".format(target_pose_tmp.tolist()), 'FG_BLUE')
+            self._debugPrint("[panda] Target final: {}".format(self.target_pose.tolist()), 'FG_BLUE')
         self._debugPrint("")
     
     
@@ -118,6 +124,76 @@ class PandaActor():
             self._gym_del()
 
 
+    """POLICY GENERATION"""
+    def policy(self):
+        self.action = np.zeros(8)
+        # PRE-GRASP APPROCH
+        if self.phase == 1:
+            if np.linalg.norm(self.preGraspGoal_pose[:3] - self.current_pose[:3]) >= self.tolerance or \
+            np.linalg.norm(self.preGraspGoal_pose[3:] - self.current_pose[3:]) >= self.tolerance:
+                self.action[0] = (self.preGraspGoal_pose[0] - self.current_pose[0]) * 6
+                self.action[1] = (self.preGraspGoal_pose[1] - self.current_pose[1]) * 6
+                self.action[2] = (self.preGraspGoal_pose[2] - self.current_pose[2]) * 6
+                self.action[3:7] = quaternion_multiply(self.preGraspGoal_pose[3:], self.current_pose[3:])
+                self.action[7] = 1 # open gripper
+            else:
+                self.phase = 2
+                print_col("PRE-GRASP: successful", 'FG_YELLOW_BRIGHT')
+                time.sleep(self.phase_change_delay)
+
+        # GRASP APPROCH
+        if self.phase == 2: 
+            if np.linalg.norm(self.objOnStart_pose[:3] - self.current_pose[:3]) >= self.tolerance or \
+            np.linalg.norm(self.objOnStart_pose[3:] - self.current_pose[3:]) >= self.tolerance:
+                self.action[0] = (self.objOnStart_pose[0] - self.current_pose[0]) * 6
+                self.action[1] = (self.objOnStart_pose[1] - self.current_pose[1]) * 6
+                self.action[2] = (self.objOnStart_pose[2] - self.current_pose[2]) * 6
+                self.action[3:7] = quaternion_multiply(self.objOnStart_pose[3:], self.current_pose[3:])
+                self.action[7] = 1 # open gripper
+            else:
+                self.phase = 3
+                self.gripper_step = 0
+                print_col("GRASP: successful", 'FG_YELLOW_BRIGHT')
+                time.sleep(self.phase_change_delay)
+
+        # CLOSE GRIPPER
+        if self.phase == 3: 
+            if self.gripper_step < self.gripper_move_steps:
+                self.action = np.array([0, 0, 0,  0, 0, 0, 1,  -1]) # close gripper
+                self.gripper_step += 1
+            else:
+                self.phase = 4
+                self.gripper_step = 0
+                print_col("GRIPPER CLOSE: successful", 'FG_YELLOW_BRIGHT')
+                time.sleep(self.phase_change_delay)
+
+        # PLACE APPROCH
+        if self.phase == 4:
+            if np.linalg.norm(self.goal_pose[:3] - self.current_pose[:3]) >= self.tolerance or \
+            np.linalg.norm(self.goal_pose[3:] - self.current_pose[3:]) >= self.tolerance:
+                self.action[0] = (self.goal_pose[0] - self.current_pose[0]) * 6
+                self.action[1] = (self.goal_pose[1] - self.current_pose[1]) * 6
+                self.action[2] = (self.goal_pose[2] - self.current_pose[2]) * 6
+                self.action[3:7] = quaternion_multiply(self.goal_pose[3:], self.current_pose[3:])
+                self.action[7] = -1 # close gripper
+            else:
+                self.phase = 0
+                print_col("POST-GRASP: successful", 'FG_YELLOW_BRIGHT')
+                time.sleep(self.phase_change_delay)
+        
+        if self.phase == 0: # limit the number of timesteps in the episode to a fixed duration
+            self.action = np.array([0, 0, 0,  0, 0, 0, 1,  -1]) # close gripper
+    
+
+    def policy2(self):
+        self.action = np.array([0.10, 0, 0,  0, 0, 0, 1,  -1]) # close gripper
+        self.gripper_step += 1
+        if self.gripper_step > 10:
+            self.action = np.array([0, 0, 0,  0, 0, 0, 1,  1]) # open gripper
+            self.phase = 0
+            time.sleep(self.phase_change_delay)
+
+
     """GYM BEHAVIOUR"""
     def _gym_init(self, scenario, render):
         # create gym environment
@@ -125,8 +201,6 @@ class PandaActor():
 
 
     def _gym_reset(self):
-        self.phase = 1  
-
         # start to do the demo
         observation = self.env.reset()
 
@@ -153,69 +227,6 @@ class PandaActor():
         current_posit = observation["observation"][:3]             # grip_pos
         current_orien = [0, 0, 0, 1]
         self.current_pose = np.concatenate((current_posit, current_orien), axis=None)
-
-
-    def _gym_getAction(self):
-        self.env.render()
-        # PRE-GRASP APPROCH
-        if self.phase == 1:
-            if np.linalg.norm(self.preGraspGoal_pose[:3] - self.current_pose[:3]) >= self.tolerance or \
-               np.linalg.norm(self.preGraspGoal_pose[3:] - self.current_pose[3:]) >= self.tolerance:
-                self.action = np.zeros(8)
-                self.action[0] = (self.preGraspGoal_pose[0] - self.current_pose[0]) * self.offset
-                self.action[1] = (self.preGraspGoal_pose[1] - self.current_pose[1]) * self.offset
-                self.action[2] = (self.preGraspGoal_pose[2] - self.current_pose[2]) * self.offset
-                self.action[3:7] = quaternion_multiply(self.preGraspGoal_pose[3:], self.current_pose[3:])
-                self.action[7] = 1 # open gripper
-            else:
-                self.phase = 2
-                print_col("PRE-GRASP: successful", 'FG_YELLOW_BRIGHT')
-                time.sleep(self.phase_change_delay)
-
-        # GRASP APPROCH
-        if self.phase == 2: 
-            if np.linalg.norm(self.objOnStart_pose[:3] - self.current_pose[:3]) >= self.tolerance or \
-               np.linalg.norm(self.objOnStart_pose[3:] - self.current_pose[3:]) >= self.tolerance: 
-                self.action = np.zeros(8)
-                self.action[0] = (self.objOnStart_pose[0] - self.current_pose[0]) * self.offset
-                self.action[1] = (self.objOnStart_pose[1] - self.current_pose[1]) * self.offset
-                self.action[2] = (self.objOnStart_pose[2] - self.current_pose[2]) * self.offset
-                self.action[3:7] = quaternion_multiply(self.objOnStart_pose[3:], self.current_pose[3:])
-                self.action[7] = 1 # open gripper
-            else:
-                self.phase = 3
-                self.timer = 0
-                print_col("GRASP: successful", 'FG_YELLOW_BRIGHT')
-                time.sleep(self.phase_change_delay)
-
-        # CLOSE GRIPPER
-        if self.phase == 3: 
-            if self.timer < self.gripper_move_steps:
-                self.action = np.array([0, 0, 0,  0, 0, 0, 1,  -1]) # close gripper
-                self.timer += 1
-            else:
-                self.phase = 4
-                self.timer = 0
-                print_col("GRIPPER CLOSE: successful", 'FG_YELLOW_BRIGHT')
-                time.sleep(self.phase_change_delay)
-
-        # PLACE APPROCH
-        if self.phase == 4:
-            if np.linalg.norm(self.goal_pose[:3] - self.current_pose[:3]) >= self.tolerance or \
-               np.linalg.norm(self.goal_pose[3:] - self.current_pose[3:]) >= self.tolerance:
-                self.action = np.zeros(8)
-                self.action[0] = (self.goal_pose[0] - self.current_pose[0]) * self.offset
-                self.action[1] = (self.goal_pose[1] - self.current_pose[1]) * self.offset
-                self.action[2] = (self.goal_pose[2] - self.current_pose[2]) * self.offset
-                self.action[3:7] = quaternion_multiply(self.goal_pose[3:], self.current_pose[3:])
-                self.action[7] = -1 # close gripper
-            else:
-                self.phase = 0
-                print_col("POST-GRASP: successful", 'FG_YELLOW_BRIGHT')
-                time.sleep(self.phase_change_delay)
-        
-        if self.phase == 0: # limit the number of timesteps in the episode to a fixed duration
-            self.action = np.array([0, 0, 0,  0, 0, 0, 1,  -1]) # close gripper
 
 
     def _gym_step(self):
@@ -267,20 +278,12 @@ class PandaActor():
         self._debugPrint("[real] Start: {}\n".format(self.current_pose.tolist() + [self.current_gripper]), 'FG_BLUE')
         
 
-    def _robot_getAction(self, time_step):
-        self.target_pose = self.current_pose.copy()
-        if time_step < 5:
-            self.target_pose[0] += 0.01
-        else:
-            self.target_pose[0] -= 0.01
-        self.target_gripper = self.current_gripper
-
-        self._debugPrint("[real] Target: {}".format(self.target_pose.tolist() + [self.target_gripper]), 'FG_BLUE')
-    
-    
     def _robot_step(self):
+        # Process grasp information
+        grasp = 1 if self.action[7] < 0 else 0
+            
         # Send goal
-        self.panda.sendGoalState(self.target_pose.tolist() + [self.target_gripper, 0]) # gripper_open
+        self.panda.sendGoalState(self.target_pose.tolist() + [self.target_gripper, grasp]) # gripper_open
 
         # Get current pose and gripper state of Panda
         current_msg = self.panda.getCurrentState()
@@ -317,7 +320,7 @@ def main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENABLED, MODE, HOST, PORT):
                 print_col("[Step {:>3}]------------------------------------------------".format(time_step), 'FG_GREEN')
             
             # generate new action from observations
-            my_actor.getAction(time_step)
+            my_actor.getAction()
 
             # perform a step and get new observations
             my_actor.step()
