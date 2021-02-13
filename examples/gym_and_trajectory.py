@@ -6,9 +6,9 @@ sys.path.append("../scripts/")
 from src.panda_server import PandaInterface
 from src.colors import print_col, colorize
 import gym
+import panda_gym
 import numpy as np
 import time
-import panda_gym
 
 
 class PandaActor():

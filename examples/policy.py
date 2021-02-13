@@ -15,7 +15,6 @@ class PandaActor():
         # demo parameters
         self.debug_enabled = DEBUG_ENABLED
         self.tolerance = 0.005     # [m]
-        self.timer = 0
 
         # initialize
         self.panda = PandaInterface(HOST, PORT)
@@ -52,9 +51,9 @@ class PandaActor():
         self._debugPrint("[real] Start: {}\n".format(self.current_pose.tolist() + [self.current_gripper]), 'FG_BLUE')
         
 
-    def getAction(self):
+    def getAction(self, time_step):
         self.target_pose = self.current_pose.copy()
-        if self.timer < 5:
+        if time_step < 5:
             self.target_pose[0] += 0.01
         else:
             self.target_pose[0] -= 0.01
@@ -64,8 +63,6 @@ class PandaActor():
     
     
     def step(self):
-        self.timer += 1
-
         # Send goal
         self.panda.sendGoalState(self.target_pose.tolist() + [self.target_gripper, 0]) # gripper_open
 
@@ -104,7 +101,7 @@ def main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENABLED, HOST, PORT):
                 print_col("[Step {:>3}]------------------------------------------------".format(time_step), 'FG_GREEN')
             
             # generate new action from observations
-            my_actor.getAction()
+            my_actor.getAction(time_step)
 
             # perform a step and get new observations
             my_actor.step()
