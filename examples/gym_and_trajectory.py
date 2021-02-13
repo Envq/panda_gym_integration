@@ -322,16 +322,25 @@ if __name__ == "__main__":
     PORT = 2000
     NUM_EPISODES = 1
     LEN_EPISODE = 100
-    DEBUG_ENABLED = True
+    DEBUG_ENABLED = False
     RENDER = True
     ENABLE_REAL_PANDA = False
 
+
     if (len(sys.argv) > 1):
-        if sys.argv[1] == 'real':
-            ENABLE_REAL_PANDA = True
+        if sys.argv[1] == "real":
+            ENABLE_REAL_PANDA = sys.argv[1]
 
-        if len(sys.argv) > 2:
-            LEN_EPISODE = int(sys.argv[2])
+    if len(sys.argv) > 2:
+        if sys.argv[2] == 'debug':
+            DEBUG_ENABLED = True
 
+    if len(sys.argv) > 3:
+        if sys.argv[3] == 'render':
+            RENDER = True
+
+    if len(sys.argv) > 4:
+        LEN_EPISODE = int(sys.argv[4])
+            
 
     main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENABLED, RENDER, ENABLE_REAL_PANDA, HOST, PORT)

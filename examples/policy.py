@@ -130,12 +130,13 @@ if __name__ == "__main__":
     LEN_EPISODE = 100
     DEBUG_ENABLED = False
 
-    if (len(sys.argv) > 1):
+
+    if len(sys.argv) > 1:
         if sys.argv[1] == 'debug':
             DEBUG_ENABLED = True
 
-        if len(sys.argv) > 2:
-            LEN_EPISODE = int(sys.argv[2])
+    if (len(sys.argv) > 2):
+        LEN_EPISODE = int(sys.argv[2])
 
-
+            
     main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENABLED, HOST, PORT)

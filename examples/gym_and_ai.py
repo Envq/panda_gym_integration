@@ -346,12 +346,17 @@ if __name__ == "__main__":
     DEBUG_ENABLED = False
     MODE = "sim"
 
+
     if (len(sys.argv) > 1):
         if sys.argv[1] == 'sim' or sys.argv[1] == "real":
             MODE = sys.argv[1]
 
-        if len(sys.argv) > 2:
-            LEN_EPISODE = int(sys.argv[2])
+    if len(sys.argv) > 2:
+        if sys.argv[2] == 'debug':
+            DEBUG_ENABLED = True
 
+    if len(sys.argv) > 3:
+        LEN_EPISODE = int(sys.argv[3])
+            
 
     main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENABLED, MODE, HOST, PORT)
