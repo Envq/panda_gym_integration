@@ -72,7 +72,6 @@ class PandaActor():
         self._loadAI()
 
     
-    
     def _debugPrint(self, msg, color='FG_DEFAULT'):
         if self.debug_enabled: 
             print_col(msg, color)
@@ -103,15 +102,6 @@ class PandaActor():
         
         # generate pre_grasp pose
         self.preGrasp_pose = self.objOnStart_pose.copy()
-        if self.current_pose[0] > self.objOnStart_pose[0]:
-            self.preGrasp_pose[0] += 0.003
-        else:
-            self.preGrasp_pose[0] -= 0.003
-
-        if self.current_pose[1] > self.objOnStart_pose[1]:
-            self.preGrasp_pose[1] += 0.002
-        else:
-            self.preGrasp_pose[1] -= 0.002
         self.preGrasp_pose[2] += 0.031  # [m] above the obj
 
         # Debug
@@ -213,8 +203,8 @@ class PandaActor():
     def _policyAI(self, time_step):
         # PRE-GRASP
         if self.phase == 1:
-            if np.linalg.norm(self.current_pose[:3] - self.preGrasp_pose[:3]) >= 0.031 or \
-               np.linalg.norm(self.current_pose[3:] - self.preGrasp_pose[3:]) >= self.tolerance:
+            if np.linalg.norm(self.preGrasp_pose[:3] - self.current_pose[:3]) >= 0.031 or \
+               np.linalg.norm(self.preGrasp_pose[3:] - self.current_pose[3:]) >= self.tolerance:
                 with torch.no_grad():
                     input_tensor = process_inputs(self.obs, self.preGrasp_pose[:3], self.o_mean_approach, self.o_std_approach, self.g_mean_approach, self.g_std_approach, self.args)
                     pi = self.actor_network_approach(input_tensor)
@@ -230,8 +220,8 @@ class PandaActor():
 
         # GRASP
         if self.phase == 2: 
-            if np.linalg.norm(self.current_pose[:3] - self.obj_pose[:3]) >= 0.015 or \
-               np.linalg.norm(self.current_pose[3:] - self.obj_pose[3:]) >= self.tolerance:
+            if np.linalg.norm(self.obj_pose[:3] - self.current_pose[:3]) >= 0.015 or \
+               np.linalg.norm(self.obj_pose[3:] - self.current_pose[3:]) >= self.tolerance:
                 with torch.no_grad():
                     input_tensor = process_inputs(self.obs, self.obj_pose[:3], self.o_mean_manipulate, self.o_std_manipulate, self.g_mean_manipulate, self.g_std_manipulate, self.args)
                     pi = self.actor_network_manipulate(input_tensor)
@@ -259,8 +249,8 @@ class PandaActor():
 
         # PLACE
         if self.phase == 4:
-            if np.linalg.norm(self.goal_pose[:3] - self.obj_pose[:3]) >= 0.010 or \
-               np.linalg.norm(self.goal_pose[3:] - self.obj_pose[3:]) >= self.tolerance:
+            if np.linalg.norm(self.goal_pose[:3] - self.current_pose[:3]) >= 0.031 or \
+               np.linalg.norm(self.goal_pose[3:] - self.current_pose[3:]) >= self.tolerance:
                 with torch.no_grad():
                     input_tensor = process_inputs(self.obs, self.goal_pose[:3], self.o_mean_retract, self.o_std_retract, self.g_mean_retract, self.g_std_retract, self.args)
                     pi = self.actor_network_retract(input_tensor)
@@ -353,38 +343,7 @@ class PandaActor():
         self.env = gym.make(scenario, render=render)
 
 
-    def _gym_reset(self):
-        # reset environment and get first observation
-        observation = self.env.reset()
-        self.obs = observation["observation"]
-
-        # get object pose on start
-        objOnStart_posit = observation["observation"][3:6]         # object_pos
-        objOnStart_orien = [0, 0, 0, 1]
-        self.objOnStart_pose = np.concatenate((objOnStart_posit, objOnStart_orien), axis=None)
-
-        # get goal pose
-        goal_posit = observation["desired_goal"]
-        goal_orien = [0, 0, 0, 1]
-        self.goal_pose = np.concatenate((goal_posit, goal_orien), axis=None)
-
-        # get current tcp pose (on gym frame)
-        current_posit = observation["observation"][:3]             # grip_pos
-        current_orien = [0, 0, 0, 1]
-        self.current_pose = np.concatenate((current_posit, current_orien), axis=None)
-
-        # get current fingers width
-        finger0 = observation["observation"][9]
-        finger1 = observation["observation"][10]
-        self.current_gripper = finger0 + finger1                   # gripper_state
-
-
-    def _gym_step(self):
-        # put actions into the environment and get observations
-        position = self.action[:3].tolist()
-        grip = [self.action[7]]
-        observation, reward, done, info = self.env.step(position + grip)
-
+    def _gym_obs(self, observation):
         # observation
         self.obs = observation["observation"]
 
@@ -404,6 +363,34 @@ class PandaActor():
         self.current_gripper = finger0 + finger1                   # gripper_state
 
 
+    def _gym_reset(self):
+        # reset environment and get first observation
+        observation = self.env.reset()
+
+        # get observation
+        self._gym_obs(observation)
+
+        # get object pose on start
+        objOnStart_posit = observation["observation"][3:6]         # object_pos
+        objOnStart_orien = [0, 0, 0, 1]
+        self.objOnStart_pose = np.concatenate((objOnStart_posit, objOnStart_orien), axis=None)
+
+        # get goal pose
+        goal_posit = observation["desired_goal"]
+        goal_orien = [0, 0, 0, 1]
+        self.goal_pose = np.concatenate((goal_posit, goal_orien), axis=None)
+
+
+    def _gym_step(self):
+        # put actions into the environment and get observations
+        position = self.action[:3].tolist()
+        grip = [self.action[7]]
+        observation, reward, done, info = self.env.step(position + grip)
+
+        # get observation
+        self._gym_obs(observation)
+
+
     def _gym_del(self):
         # close gym environment
         self.env.close()
@@ -415,19 +402,7 @@ class PandaActor():
         self.panda.getCurrentState() # get panda-client connection
 
 
-    def _robot_reset(self):
-        # get object pose on start
-        self.objOnStart_pose = np.array([0.7019080739083265, -0.11301889621397332, 0.125, 0.0, 0.0, 0.0, 1.0])
-        
-        # get goal pose
-        self.goal_pose = np.array([0.738619682797228, 0.04043141396766836, 0.5272451383552441, 0.0, 0.0, 0.0, 1.0])
-        
-        # start msg
-        start_msg = [0.3, 0.0, 0.6,  0.0, 0.0, 0.0, 1.0,  0.08, 0]           
-
-        # send start state msg
-        self.panda.sendGoalState(start_msg) 
-
+    def _robot_obs(self):
         # get current state msg
         current_msg = self.panda.getCurrentState()
 
@@ -441,6 +416,23 @@ class PandaActor():
 
         # get current fingers width
         self.current_gripper = current_msg[7]          # gripper_state
+
+
+    def _robot_reset(self):
+        # get object pose on start
+        self.objOnStart_pose = np.array([0.7019080739083265, -0.11301889621397332, 0.125, 0.0, 0.0, 0.0, 1.0])
+        
+        # get goal pose
+        self.goal_pose = np.array([0.738619682797228, 0.04043141396766836, 0.5272451383552441, 0.0, 0.0, 0.0, 1.0])
+        
+        # start msg
+        start_msg = [0.3, 0.0, 0.6,  0.0, 0.0, 0.0, 1.0,  0.08, 0]           
+
+        # send start state msg
+        self.panda.sendGoalState(start_msg)
+
+        # get observation
+        self._robot_obs()
         
 
     def _robot_step(self):
@@ -450,19 +442,8 @@ class PandaActor():
         # Send goal
         self.panda.sendGoalState(self.target_pose.tolist() + [self.target_gripper, grasp]) # gripper_open
 
-        # Get current pose and gripper state of Panda
-        current_msg = self.panda.getCurrentState()
-
-        # Catch real-panda errors
-        if current_msg == "error":
-            print_col("Abort", 'FG_RED')
-            sys.exit()
-            
-        self.current_pose = np.array(current_msg[:7])
-        self.current_gripper = current_msg[7] # fingers width
-
-        self._debugPrint("[real] Current: {}".format(self.current_pose.tolist() + [self.current_gripper]), 'FG_BLUE')
-        self._debugPrint("")
+        # get observation
+        self._robot_obs()
 
 
     def _robot_del(self):
@@ -509,7 +490,7 @@ if __name__ == "__main__":
     # PARAMETERS
     HOST = "127.0.0.1"
     PORT = 2000
-    NUM_EPISODES = 3
+    NUM_EPISODES = 1
     LEN_EPISODE = 100
     DEBUG_ENABLED = False
     MODE = "sim"
