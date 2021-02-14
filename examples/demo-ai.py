@@ -123,11 +123,11 @@ class PandaActor():
         self._debugPrint("start_pose: {}\n".format(current_pose.tolist()), 'FG_WHITE')
 
         
-    def getAction(self):
+    def getAction(self, time_step):
         # Generate action with policy
-        self._policyAI()
+        self._policyAI(time_step)
         action = self.action.copy()
-        action[:3]*0.05  # Correct with panda-gym (limit maximum change in position)
+        # action[:3] *= 0.05  # Correct with panda-gym (limit maximum change in position)
 
         if MODE == "sim":
             self.env.render()
@@ -210,8 +210,7 @@ class PandaActor():
 
 
     """POLICY GENERATION and AI"""
-    def _policyAI(self):
-        self.action = np.zeros(8)
+    def _policyAI(self, time_step):
         # PRE-GRASP
         if self.phase == 1:
             if np.linalg.norm(self.current_pose[:3] - self.preGrasp_pose[:3]) >= 0.031 or \
@@ -219,10 +218,11 @@ class PandaActor():
                 with torch.no_grad():
                     input_tensor = process_inputs(self.obs, self.preGrasp_pose[:3], self.o_mean_approach, self.o_std_approach, self.g_mean_approach, self.g_std_approach, self.args)
                     pi = self.actor_network_approach(input_tensor)
-                    position = pi.detach().cpu().numpy().squeeze()
+                    action = pi.detach().cpu().numpy().squeeze()
+                    position = action[:3]
                 orientation = quaternion_multiply(self.current_pose[3:], self.preGrasp_pose[3:])
                 grip = [1] # open gripper
-                self.action = np.concatenate((position, orientation + grip), axis=None)
+                self.action = np.append(np.append(position, orientation), grip)
             else:
                 self.phase = 2
                 print_col("PRE-GRASP: successful", 'FG_YELLOW_BRIGHT')
@@ -235,10 +235,11 @@ class PandaActor():
                 with torch.no_grad():
                     input_tensor = process_inputs(self.obs, self.obj_pose[:3], self.o_mean_manipulate, self.o_std_manipulate, self.g_mean_manipulate, self.g_std_manipulate, self.args)
                     pi = self.actor_network_manipulate(input_tensor)
-                    position = pi.detach().cpu().numpy().squeeze()
+                    action = pi.detach().cpu().numpy().squeeze()
+                    position = action[:3]
                 orientation = quaternion_multiply(self.current_pose[3:], self.preGrasp_pose[3:])
                 grip = [1] # open gripper
-                self.action = np.concatenate((position, orientation + grip), axis=None)
+                self.action = np.append(np.append(position, orientation), grip)
             else:
                 self.phase = 3
                 self.gripper_step = 0
@@ -263,10 +264,11 @@ class PandaActor():
                 with torch.no_grad():
                     input_tensor = process_inputs(self.obs, self.goal_pose[:3], self.o_mean_retract, self.o_std_retract, self.g_mean_retract, self.g_std_retract, self.args)
                     pi = self.actor_network_retract(input_tensor)
-                    position = pi.detach().cpu().numpy().squeeze()
+                    action = pi.detach().cpu().numpy().squeeze()
+                    position = action[:3]
                 orientation = quaternion_multiply(self.current_pose[3:], self.preGrasp_pose[3:])
                 grip = [-1] # close gripper
-                self.action = np.concatenate((position, orientation + grip), axis=None)
+                self.action = np.append(np.append(position, orientation), grip)
             else:
                 self.phase = 0
                 print_col("POST-GRASP: successful", 'FG_YELLOW_BRIGHT')
@@ -483,7 +485,7 @@ def main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENABLED, MODE, HOST, PORT):
                 print_col("[Step {:>3}]------------------------------------------------".format(time_step), 'FG_GREEN')
             
             # generate new action from observations
-            my_actor.getAction()
+            my_actor.getAction(time_step)
 
             # perform a step and get new observations
             my_actor.step()
@@ -509,7 +511,7 @@ if __name__ == "__main__":
     PORT = 2000
     NUM_EPISODES = 3
     LEN_EPISODE = 100
-    DEBUG_ENABLED = True
+    DEBUG_ENABLED = False
     MODE = "sim"
 
     main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENABLED, MODE, HOST, PORT)
