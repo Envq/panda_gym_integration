@@ -1,6 +1,5 @@
-# PANDA GYM MOVEIT
-This package is useful for connect [panda_gym](https://github.com/qgallouedec/panda-gym) with ROS for control real Panda robot
-
+# PANDA GYM INTEGRATION
+This package connects [panda_gym](https://github.com/qgallouedec/panda-gym) with the real robot (Panda Franka Emika) through ROS
 
 ## Table of Contents
 
@@ -137,7 +136,10 @@ I used these extensions:
 
 ---
 ## Author
-**Enrico Sgarbanti** [@**Envq**](https://github.com/Envq)
+**Enrico Sgarbanti** [@**Envq**](https://github.com/Envq) for panda-gym integration with real robot
+
+**Luca Marzari** [@**LM095**](https://github.com/LM095) for AI. look [here](https://github.com/LM095/Multi-Subtask-DRL-for-Pick-and-Place-Task) for more details
+
 
 
 ## License
