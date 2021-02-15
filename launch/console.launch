@@ -1,6 +1,6 @@
 <launch>
       <node name="console_node" 
-            pkg="panda_gym_moveit" 
+            pkg="panda_gym_integration" 
             type="console.py" 
             respawn="false" 
             output="screen">

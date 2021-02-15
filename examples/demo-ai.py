@@ -5,6 +5,7 @@ sys.path.append("../scripts/")
 
 # Panda Interface
 from src.panda_server import PandaInterface
+from src.utils import quaternion_multiply, transform
 from src.colors import print_col, colorize
 import numpy as np
 import time
@@ -16,21 +17,6 @@ import torch
 from rl_modules.models import actor
 from rl_modules.arguments import get_args
 
-
-
-def quaternion_multiply(quaternion1, quaternion0):
-    x0, y0, z0, w0 = quaternion0
-    x1, y1, z1, w1 = quaternion1
-    return np.array([ x1 * w0 + y1 * z0 - z1 * y0 + w1 * x0,
-                     -x1 * z0 + y1 * w0 + z1 * x0 + w1 * y0,
-                      x1 * y0 - y1 * x0 + z1 * w0 + w1 * z0,
-                     -x1 * x0 - y1 * y0 - z1 * z0 + w1 * w0 ], dtype=np.float64)
-
-
-def transform(pose1, pose2):
-    position = pose1[:3] + pose2[:3]
-    orientation = quaternion_multiply(pose1[3:], pose2[3:])
-    return np.concatenate((position, orientation), axis=None)
 
 
 def process_inputs(o, g, o_mean, o_std, g_mean, g_std, args):
