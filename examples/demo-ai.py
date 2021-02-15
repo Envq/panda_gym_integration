@@ -42,7 +42,8 @@ class PandaActor():
         self.phase_change_delay = 1   # [sec]
         self.obj_width = 0.04         # [m]
         self.gripper_move_steps = 10  # [step]
-        self.gripper_step = 0
+        self.approach_max_steps = 20
+        self.timer = 0
         self.phase = 0  # 1=pre-grasp, 2=grasp, 3=close, 4=place
 
         # initialize
@@ -64,7 +65,23 @@ class PandaActor():
 
 
     def goalAchieved(self):
-        return self.phase == 0
+        if self.phase == 0:
+            if MODE == "sim":
+                goal_pose  = transform(self.panda_to_gym, self.goal_pose)
+                end_pose = transform(self.panda_to_gym, self.current_pose)
+
+            elif MODE == "real":
+                self._robot_reset()
+                goal_pose  = self.goal_pose.copy()
+                end_pose = self.current_pose.copy()
+
+            print("--------------------------------------------------------")
+            print_col("goal_pose: {}".format(goal_pose.tolist()), 'FG_CYAN')
+            print_col("end_pose: {}".format(end_pose.tolist()), 'FG_CYAN')
+            print_col("error in position: {}".format(np.linalg.norm(goal_pose[:3] - end_pose[:3])), 'FG_CYAN')
+            print_col("error in orientation: {}".format(np.linalg.norm(goal_pose[3:] - end_pose[3:])), 'FG_CYAN')
+            return True
+        return False
     
     
     def reset(self):
@@ -84,7 +101,7 @@ class PandaActor():
             objOnStart_pose = self.objOnStart_pose.copy()
             goal_pose  = self.goal_pose.copy()
             current_pose = self.current_pose.copy()
-            current_gripper = self.current_gripper.copy()
+            current_gripper = self.current_gripper
         
         # generate pre_grasp pose
         self.preGrasp_pose = self.objOnStart_pose.copy()
@@ -95,15 +112,17 @@ class PandaActor():
         self._debugPrint("goal_pose: {}".format(goal_pose.tolist()), 'FG_MAGENTA')
         self._debugPrint("preGrasp_pose: {}\n".format(transform(self.panda_to_gym, self.preGrasp_pose).tolist()), 'FG_MAGENTA')
 
-        self._debugPrint("start_gripper: {}".format(current_gripper.tolist()), 'FG_WHITE')
         self._debugPrint("start_pose: {}\n".format(current_pose.tolist()), 'FG_WHITE')
+        self._debugPrint("start_gripper: {}".format(current_gripper), 'FG_WHITE')
 
         
-    def getAction(self, time_step):
+    def getAction(self):
         # Generate action with policy
-        self._policyAI(time_step)
+        # self._policyAI()
+        # self._policyHandEng()
+        self._policySimple()
         action = self.action.copy()
-        # action[:3] *= 0.05  # Correct with panda-gym (limit maximum change in position)
+        action[:3] *= 0.05  # Correct with panda-gym (limit maximum change in position)
 
         if MODE == "sim":
             self.env.render()
@@ -116,7 +135,7 @@ class PandaActor():
 
         # Debug
         self._debugPrint("action: {}".format(self.action.tolist()), 'FG_MAGENTA')
-        print_col("action final: {}\n".format(action.tolist()), 'FG_MAGENTA')
+        print_col("action final: {}".format(action.tolist()), 'FG_MAGENTA')
         
         self._debugPrint("target_pose with correction: {}\n".format(self.target_pose.tolist()), 'FG_WHITE')
     
@@ -127,18 +146,15 @@ class PandaActor():
             self._gym_step()
             current_pose = transform(self.panda_to_gym, self.current_pose)
             current_gripper = self.current_gripper.copy()
-            obj_pose = transform(self.panda_to_gym, self.obj_pose)
 
         elif MODE == "real":
             self._robot_step()
             current_pose = self.current_pose.copy()
-            current_gripper = self.current_gripper.copy()
-            obj_pose = self.obj_pose.copy()
+            current_gripper = self.current_gripper
 
         # Debug
-        self._debugPrint("current_gripper: {}".format(current_gripper.tolist()), 'FG_WHITE')
         self._debugPrint("current_pose: {}\n".format(current_pose.tolist()), 'FG_WHITE')
-        self._debugPrint("obj_pose: {}\n".format(obj_pose.tolist()), 'FG_WHITE')
+        self._debugPrint("current_gripper: {}".format(current_gripper), 'FG_WHITE')
 
 
     def __del__(self):
@@ -186,11 +202,12 @@ class PandaActor():
 
 
     """POLICY GENERATION and AI"""
-    def _policyAI(self, time_step):
+    def _policyAI(self):
         # PRE-GRASP
         if self.phase == 1:
-            if np.linalg.norm(self.preGrasp_pose[:3] - self.current_pose[:3]) >= 0.031 or \
-               np.linalg.norm(self.preGrasp_pose[3:] - self.current_pose[3:]) >= self.tolerance:
+            if self.timer < self.approach_max_steps and (\
+               np.linalg.norm(self.preGrasp_pose[:3] - self.current_pose[:3]) >= 0.031 or \
+               np.linalg.norm(self.preGrasp_pose[3:] - self.current_pose[3:]) >= self.tolerance):
                 with torch.no_grad():
                     input_tensor = process_inputs(self.obs, self.preGrasp_pose[:3], self.o_mean_approach, self.o_std_approach, self.g_mean_approach, self.g_std_approach, self.args)
                     pi = self.actor_network_approach(input_tensor)
@@ -199,17 +216,19 @@ class PandaActor():
                 orientation = quaternion_multiply(self.current_pose[3:], self.preGrasp_pose[3:])
                 grip = [1] # open gripper
                 self.action = np.append(np.append(position, orientation), grip)
+                self.timer += 1
             else:
                 self.phase = 2
+                self.timer = 0
                 print_col("PRE-GRASP: successful", 'FG_YELLOW_BRIGHT')
                 time.sleep(self.phase_change_delay)
 
         # GRASP
         if self.phase == 2: 
-            if np.linalg.norm(self.obj_pose[:3] - self.current_pose[:3]) >= 0.015 or \
-               np.linalg.norm(self.obj_pose[3:] - self.current_pose[3:]) >= self.tolerance:
+            if np.linalg.norm(self.objOnStart_pose[:3] - self.current_pose[:3]) >= 0.015 or \
+               np.linalg.norm(self.objOnStart_pose[3:] - self.current_pose[3:]) >= self.tolerance:
                 with torch.no_grad():
-                    input_tensor = process_inputs(self.obs, self.obj_pose[:3], self.o_mean_manipulate, self.o_std_manipulate, self.g_mean_manipulate, self.g_std_manipulate, self.args)
+                    input_tensor = process_inputs(self.obs, self.objOnStart_pose[:3], self.o_mean_manipulate, self.o_std_manipulate, self.g_mean_manipulate, self.g_std_manipulate, self.args)
                     pi = self.actor_network_manipulate(input_tensor)
                     action = pi.detach().cpu().numpy().squeeze()
                     position = action[:3]
@@ -218,18 +237,18 @@ class PandaActor():
                 self.action = np.append(np.append(position, orientation), grip)
             else:
                 self.phase = 3
-                self.gripper_step = 0
+                self.timer = 0
                 print_col("GRASP: successful", 'FG_YELLOW_BRIGHT')
                 time.sleep(self.phase_change_delay)
 
         # CLOSE GRIPPER
         if self.phase == 3: 
-            if self.gripper_step < self.gripper_move_steps:
-                self.action = np.array([0, 0, 0,  0, 0, 0, 1,  -1]) # close gripper
-                self.gripper_step += 1
+            if self.timer < self.gripper_move_steps:
+                self.action = np.array([0., 0., 0.,  0., 0., 0., 1.,  -1]) # close gripper
+                self.timer += 1
             else:
                 self.phase = 4
-                self.gripper_step = 0
+                self.timer = 0
                 print_col("GRIPPER CLOSE: successful", 'FG_YELLOW_BRIGHT')
                 time.sleep(self.phase_change_delay)
 
@@ -251,10 +270,10 @@ class PandaActor():
                 time.sleep(self.phase_change_delay)
         
         if self.phase == 0: # limit the number of timesteps in the episode to a fixed duration
-            self.action = np.array([0, 0, 0,  0, 0, 0, 1,  -1]) # close gripper
+            self.action = np.array([0., 0., 0.,  0., 0., 0., 1.,  -1]) # close gripper
     
 
-    def _policyInterpolation(self):
+    def _policyHandEng(self):
         self.action = np.zeros(8)
         # PRE-GRASP APPROCH
         if self.phase == 1:
@@ -281,18 +300,18 @@ class PandaActor():
                 self.action[7] = 1 # open gripper
             else:
                 self.phase = 3
-                self.gripper_step = 0
+                self.timer = 0
                 print_col("GRASP: successful", 'FG_YELLOW_BRIGHT')
                 time.sleep(self.phase_change_delay)
 
         # CLOSE GRIPPER
         if self.phase == 3: 
-            if self.gripper_step < self.gripper_move_steps:
-                self.action = np.array([0, 0, 0,  0, 0, 0, 1,  -1]) # close gripper
-                self.gripper_step += 1
+            if self.timer < self.gripper_move_steps:
+                self.action = np.array([0., 0., 0.,  0., 0., 0., 1.,  -1]) # close gripper
+                self.timer += 1
             else:
                 self.phase = 4
-                self.gripper_step = 0
+                self.timer = 0
                 print_col("GRIPPER CLOSE: successful", 'FG_YELLOW_BRIGHT')
                 time.sleep(self.phase_change_delay)
 
@@ -311,14 +330,14 @@ class PandaActor():
                 time.sleep(self.phase_change_delay)
         
         if self.phase == 0: # limit the number of timesteps in the episode to a fixed duration
-            self.action = np.array([0, 0, 0,  0, 0, 0, 1,  -1]) # close gripper
+            self.action = np.array([0., 0., 0.,  0., 0., 0., 1.,  -1]) # close gripper
     
 
     def _policySimple(self):
-        self.action = np.array([0.10, 0, 0,  0, 0, 0, 1,  -1]) # close gripper
-        self.gripper_step += 1
-        if self.gripper_step > 10:
-            self.action = np.array([0, 0, 0,  0, 0, 0, 1,  1]) # open gripper
+        self.action = np.array([0.10, 0., 0.,  0., 0., 0., 1.,  -1]) # close gripper
+        self.timer += 1
+        if self.timer > 10:
+            self.action = np.array([0., 0., 0.,  0., 0., 0., 1.,  1]) # open gripper
             self.phase = 0
             time.sleep(self.phase_change_delay)
 
@@ -332,11 +351,6 @@ class PandaActor():
     def _gym_obs(self, observation):
         # observation
         self.obs = observation["observation"]
-
-        # get object pose on start
-        obj_posit = observation["observation"][3:6]                # object_pos
-        obj_orien = [0, 0, 0, 1]
-        self.obj_pose = np.concatenate((obj_posit, obj_orien), axis=None)
 
         # get current tcp pose
         current_posit = observation["observation"][:3]             # grip_pos
@@ -452,7 +466,7 @@ def main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENABLED, MODE, HOST, PORT):
                 print_col("[Step {:>3}]------------------------------------------------".format(time_step), 'FG_GREEN')
             
             # generate new action from observations
-            my_actor.getAction(time_step)
+            my_actor.getAction()
 
             # perform a step and get new observations
             my_actor.step()
@@ -479,6 +493,6 @@ if __name__ == "__main__":
     NUM_EPISODES = 1
     LEN_EPISODE = 100
     DEBUG_ENABLED = False
-    MODE = "sim"
+    MODE = "real"
 
     main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENABLED, MODE, HOST, PORT)
