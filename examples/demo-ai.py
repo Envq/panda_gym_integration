@@ -45,13 +45,14 @@ class PandaActor():
         self.approach_max_steps = 20
         self.timer = 0
         self.phase = 0  # 1=pre-grasp, 2=grasp, 3=close, 4=place
-        self.time_step = 0
+        self.steps_performed = 0
 
         # results lists
         self.results = {
             'position_errors': list(),
             'orientation_errors': list(),
-            'steps': list()
+            'steps': list(),
+            'successes': 0
         }
 
         # initialize
@@ -72,10 +73,8 @@ class PandaActor():
             print_col(msg, color)
 
 
-    def printResults(self):
-        print_col("Mean position errors: {}".format(np.mean(self.results['position_errors'])), 'FG_YELLOW_BRIGHT')
-        print_col("Mean orientation errors: {}".format(np.mean(self.results['orientation_errors'])), 'FG_YELLOW_BRIGHT')
-        print_col("Mean steps: {}\n".format(np.mean(self.results['steps'])), 'FG_YELLOW_BRIGHT')
+    def getResults(self):
+        return self.results
 
 
     def goalAchieved(self):
@@ -92,7 +91,8 @@ class PandaActor():
             # Add result
             self.results['position_errors'].append(np.linalg.norm(goal_pose[:3] - end_pose[:3]))
             self.results['orientation_errors'].append(np.linalg.norm(goal_pose[3:] - end_pose[3:]))
-            self.results['steps'].append(self.time_step)
+            self.results['steps'].append(self.steps_performed)
+            self.results['successes'] += 1
             
             # Debug
             print_col("--------------------------------------------------------", 'FG_CYAN')
@@ -108,7 +108,7 @@ class PandaActor():
     def reset(self):
         # Reset phase
         self.phase = 1
-        self.time_step = 0
+        self.steps_performed = 0
 
         # Generate goal and get start pose
         if MODE == "sim":
@@ -164,7 +164,7 @@ class PandaActor():
     
     def step(self):
         # update step counter
-        self.time_step += 1
+        self.steps_performed += 1
 
         # Generate goal and get current pose
         if MODE == "sim":
@@ -510,12 +510,19 @@ def main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENABLED, MODE, HOST, PORT):
 
         print_col("Episode {} finish".format(episode), 'FG_GREEN')
         if goal_achived:
-            print_col("Goal achived in {} step".format(time_step), 'FG_GREEN_BRIGHT')
+            print_col("Goal achived in {} steps".format(time_step + 1), 'FG_GREEN_BRIGHT')
         else:
-            print_col("Goal not achived in {} step".format(time_step), 'FG_RED_BRIGHT')
+            print_col("Goal not achived in {} steps".format(time_step + 1), 'FG_RED_BRIGHT')
 
     print_col("All Episodes finish", 'FG_GREEN')
-    my_actor.printResults()
+    results = my_actor.getResults()
+    successes = results['successes']
+    fails = NUM_EPISODES - successes
+    print_col("{}/{} successes: [{} fails]".format(successes, NUM_EPISODES, fails), 'FG_YELLOW_BRIGHT')
+    if successes > 0:
+        print_col("Mean position errors: {}".format(np.mean(results['position_errors'])), 'FG_YELLOW_BRIGHT')
+        print_col("Mean orientation errors: {}".format(np.mean(results['orientation_errors'])), 'FG_YELLOW_BRIGHT')
+        print_col("Mean steps: {}\n".format(np.mean(results['steps'])), 'FG_YELLOW_BRIGHT')
 
 
 
@@ -524,7 +531,7 @@ if __name__ == "__main__":
     HOST = "127.0.0.1"
     PORT = 2000
     NUM_EPISODES = 1
-    LEN_EPISODE = 100
+    LEN_EPISODE = 1
     DEBUG_ENABLED = True
     MODE = "sim"
 
