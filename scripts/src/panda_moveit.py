@@ -246,7 +246,6 @@ class PandaMoveitInterface(object):
     """[px, py, pz, ox, oy, oz, ow, fd, gr]
         fd is the distance between the two fingers
         gr is 1 if the grasp is active, otherwise 0"""
-    print("TCP_GOAL_POSE: ", tcp_goal_pose)
     if self.moveToPoseTCP(tcp_goal_pose[:8]):
       if tcp_goal_pose[8] == 1:
         print("GRASPING...")
