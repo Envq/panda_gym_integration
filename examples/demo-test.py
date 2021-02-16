@@ -73,6 +73,7 @@ if __name__ == '__main__':
             actions[3] = 0.05
 
             observation_new, reward, _, info = env.step(actions)
+            print("action1: ", actions * 0.05)
             obs = observation_new["observation"]
             grip_pos = obs[:3]
             obs[6:9]= 0
@@ -95,6 +96,7 @@ if __name__ == '__main__':
             actions[3] = 0.05
             
             observation_new, _, _, info = env.step(actions)
+            print("action2: ", actions * 0.05)
             obs = observation_new["observation"]
             grip_pos = obs[:3]
             
@@ -116,6 +118,7 @@ if __name__ == '__main__':
 
             # put actions into the environment
             observation_new, reward, _, info = env.step(actions)
+            print("action3: ", actions * 0.05)
             obs = observation_new['observation']
             grip_pos = obs[:3]
             obs[6:9]= 0
