@@ -1,0 +1,5 @@
+function:
+
+constexpr double kRadius = 0.1;
+double angle = M_PI / 4 * (1 - std::cos(M_PI / 1.0 * time));
+double delta_x = kRadius * std::sin(angle);

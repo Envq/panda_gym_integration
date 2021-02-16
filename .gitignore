@@ -52,7 +52,8 @@ CATKIN_IGNORE
 
 
 **/__pycache__/
-examples/panda_gym
+examples/panda_gym/
+venv-panda/
 
 demo-ai/
 demo/
