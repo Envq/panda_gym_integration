@@ -11,11 +11,11 @@ the input x in both networks should be [o, g], where o is the observation and g 
 class actor(nn.Module):
     def __init__(self, env_params):
         super(actor, self).__init__()
-        self.max_action = env_params['action_max']
-        self.fc1 = nn.Linear(env_params['obs'] + env_params['goal'], 256)
+        self.max_action = env_params["action_max"]  # 1.0
+        self.fc1 = nn.Linear(env_params["obs"] + env_params["goal"], 256)  # 25 + 3 = 28, 256
         self.fc2 = nn.Linear(256, 256)
         self.fc3 = nn.Linear(256, 256)
-        self.action_out = nn.Linear(256, env_params['action'])
+        self.action_out = nn.Linear(256, env_params["action"])  # 256, 6
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
@@ -25,11 +25,12 @@ class actor(nn.Module):
 
         return actions
 
+
 class critic(nn.Module):
     def __init__(self, env_params):
         super(critic, self).__init__()
-        self.max_action = env_params['action_max']
-        self.fc1 = nn.Linear(env_params['obs'] + env_params['goal'] + env_params['action'], 256)
+        self.max_action = env_params["action_max"]  # 1.0
+        self.fc1 = nn.Linear(env_params["obs"] + env_params["goal"] + env_params["action"], 256)  # 25 + 3 + 6 = 34,256
         self.fc2 = nn.Linear(256, 256)
         self.fc3 = nn.Linear(256, 256)
         self.q_out = nn.Linear(256, 1)

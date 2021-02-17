@@ -35,6 +35,7 @@ if __name__ == '__main__':
                   'action': env.action_space.shape[0], 
                   'action_max': env.action_space.high[0],
                   }
+    print("ENV: ", env._max_episode_steps)
     # create the actor network
     actor_network_approach = actor(env_params)
     actor_network_approach.load_state_dict(model_approach)
@@ -47,7 +48,8 @@ if __name__ == '__main__':
     actor_network_retract.eval()
     success = 0
 
-    for i in range(args.demo_length):
+    for i in range(10):
+        print("Episode {}\n".format(i))
         observation = env.reset()
         obs = observation["observation"]
 
@@ -97,6 +99,8 @@ if __name__ == '__main__':
             observation_new, _, _, info = env.step(actions)
             obs = observation_new["observation"]
             grip_pos = obs[:3]
+            obs[6:9]= 0
+            obs[11:]= 0
             
             timeStep += 1
             
