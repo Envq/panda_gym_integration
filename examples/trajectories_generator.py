@@ -34,20 +34,28 @@ def process_inputs(o, g, o_mean, o_std, g_mean, g_std, args):
 
 class PandaActor():
     """GLOBAL BEHAVIOUR"""
-    def __init__(self):
+    def __init__(self, DEBUG_ENABLED):
+        # demo parameters
+        self.debug_enabled = DEBUG_ENABLED
+
         # demo attributes
         self.timeStep = 0
         self.phase = 0                                                      # 0=finish, 1=pre-grasp, 2=grasp, 3=place
         self.panda_to_gym = np.array([-0.6919, -0.7441, -0.3,  0, 0, 0, 1]) # [panda -> gym] trasformation
-        self.obj_width = 0.04                                               # [m]
+        self.obj_width = 0.04             # [m]
+        self.phase_change_delay = 1       # [sec]
         self.last_phase = self.phase
-        self.phase_change_delay = 1   # [sec]
 
         # load ai
         self._loadAI()
 
         # create gym environment
         self.env = gym.make(self.args.env_name, render=True)
+            
+    
+    def _debugPrint(self, msg, color='FG_DEFAULT'):
+        if self.debug_enabled: 
+            print_col(msg, color)
 
 
     def _loadAI(self):
@@ -95,9 +103,6 @@ class PandaActor():
         # reset environment
         observation = self.env.reset()
 
-        # get observation
-        self._gym_obs(observation)
-
         # get goal pose
         goal_posit = observation["desired_goal"]
         goal_orien = [0, 0, 0, 1]
@@ -112,6 +117,9 @@ class PandaActor():
         self.preGrasp_pose = self.objOnStart_pose.copy()
         self.preGrasp_pose[2] += 0.031  # [m] above the obj
 
+        # get observation
+        self._gym_obs(observation)
+
         # return start behaviour
         return ([0.6014990053878944, 1.5880450818915202e-06, 0.29842061906465916,  \
                 -3.8623752044513406e-06, -0.0013073068882995874, -5.91084615330739e-06, 0.9999991454490569], \
@@ -119,11 +127,6 @@ class PandaActor():
 
     
     def _gym_obs(self, observation):
-        # get obs
-        self.obs = observation["observation"]
-        self.obs[6:9] = 0
-        self.obs[11:] = 0
-
         # get current tcp pose
         current_posit = observation["observation"][:3]             # grip_pos
         current_orien = [0, 0, 0, 1]
@@ -133,6 +136,22 @@ class PandaActor():
         finger0 = observation["observation"][9]
         finger1 = observation["observation"][10]
         self.current_gripper = finger0 + finger1                   # gripper_state
+
+        # generate obs for AI
+        self.obs = np.zeros(25)
+        self.obs[:3]    = self.current_pose[:3]     # grip_pos
+        self.obs[3:6]   = self.objOnStart_pose[:3]  # object_pos
+        self.obs[6:9]   = 0                         # object_rel_pos
+        self.obs[9:11]  = [finger0, finger1]        # gripper_state
+        self.obs[11:14] = 0                         # object_rot
+        self.obs[14:17] = 0                         # object_velp
+        self.obs[17:20] = 0                         # object_velr
+        self.obs[20:23] = 0                         # grip_velp
+        self.obs[23:25] = 0                         # gripper_vel
+
+        # adjust object_pos info for retract-ai (It use object_pos as current_pose info)
+        if self.phase == 3:
+            self.obs[3:6] = self.current_pose[:3]   # object_pos
 
 
     def getTargetInfo(self):
@@ -144,7 +163,12 @@ class PandaActor():
         action[:3] *= 0.05  # Correct with panda-gym (limit maximum change in position)
 
         # generate target pose
-        target_pose = transform(transform(self.panda_to_gym, self.current_pose), action[:7])
+        current_pose = transform(self.panda_to_gym, self.current_pose)
+        target_pose = transform(current_pose, action[:7])
+
+        self._debugPrint("Action: {}".format(action.tolist()), 'FG_WHITE')
+        self._debugPrint("Current pose: {}".format(current_pose.tolist()), 'FG_WHITE')
+        self._debugPrint("Target pose: {}\n".format(target_pose.tolist()), 'FG_WHITE')
 
         # generate gripper state
         if self.phase == 3 and self.last_phase == 2:    # close gripper after grasp phase
@@ -165,7 +189,7 @@ class PandaActor():
         # PRE-GRASP
         if self.phase == 1:
             if self.timeStep <= 20 and \
-                (np.linalg.norm(self.current_pose[:3] - self.preGrasp_pose[:3]) >= 0.031 or \
+                (np.linalg.norm(self.preGrasp_pose[:3] - self.current_pose[:3]) >= 0.031 or \
                  np.linalg.norm(self.preGrasp_pose[3:] - self.current_pose[3:]) >= 0.005): 
                 with torch.no_grad():
                     input_tensor = process_inputs(self.obs, self.preGrasp_pose[:3], self.o_mean_approach, self.o_std_approach, self.g_mean_approach, self.g_std_approach, self.args)
@@ -179,12 +203,12 @@ class PandaActor():
                 self.phase = 2
                 self.timeStep = 0
                 time.sleep(self.phase_change_delay)
-                # print_col("PRE-GRASP: successful", 'FG_YELLOW_BRIGHT')
+                self._debugPrint("PRE-GRASP: successful", 'FG_YELLOW_BRIGHT')
             
         # GRASP
         if self.phase == 2: 
             if self.timeStep < self.env._max_episode_steps and \
-                (np.linalg.norm(self.current_pose[:3] - self.objOnStart_pose[:3]) >= 0.015 or \
+                (np.linalg.norm(self.objOnStart_pose[:3] - self.current_pose[:3]) >= 0.015 or \
                  np.linalg.norm(self.objOnStart_pose[3:] - self.current_pose[3:]) >= 0.005):
                 with torch.no_grad():
                     input_tensor = process_inputs(self.obs, self.objOnStart_pose[:3], self.o_mean_manipulate, self.o_std_manipulate, self.g_mean_manipulate, self.g_std_manipulate, self.args)
@@ -198,7 +222,7 @@ class PandaActor():
                 self.phase = 3
                 self.timeStep = 0
                 time.sleep(self.phase_change_delay)
-                # print_col("GRASP: successful", 'FG_YELLOW_BRIGHT')
+                self._debugPrint("GRASP: successful", 'FG_YELLOW_BRIGHT')
    
         # PLACE
         if self.phase == 3:
@@ -216,7 +240,7 @@ class PandaActor():
             else:
                 self.phase = 0
                 time.sleep(self.phase_change_delay)
-                # print_col("POST-GRASP: successful", 'FG_YELLOW_BRIGHT')
+                self._debugPrint("POST-GRASP: successful", 'FG_YELLOW_BRIGHT')
 
         # FINISH
         if self.phase == 0:
@@ -241,12 +265,12 @@ class PandaActor():
 
 
 
-def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH):
+def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENABLED):
     # for writing
     trajectory = list()
 
     # initialize Actor
-    my_actor = PandaActor()
+    my_actor = PandaActor(DEBUG_ENABLED)
 
     # statistics
     results = {
@@ -324,12 +348,13 @@ def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH):
 
 
 if __name__ == "__main__":
+    DEBUG_ENABLED = False
     NUM_EPISODES = 1
     LEN_EPISODE = 150
-    WRITE_ENABLE = True
-    FILE_NAME = "trajectory_" + datetime.today().strftime('%Y-%m-%d-%H:%M:%S')
-    # FILE_NAME = "trajectory"
+    WRITE_ENABLE = False
+    # FILE_NAME = "trajectory_" + datetime.today().strftime('%Y-%m-%d-%H:%M:%S')
+    FILE_NAME = "trajectory"
            
 
     file_path = os.path.join(os.path.dirname(__file__), "../data/trajectories/" + FILE_NAME + ".txt")
-    main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, file_path)
+    main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, file_path, DEBUG_ENABLED)
