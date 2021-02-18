@@ -22,46 +22,23 @@ import os
 
 
 class PandaActor():
-    """GLOBAL BEHAVIOUR"""
-    def __init__(self, DEBUG_ENABLED):
-        # demo parameters
-        self.debug_enabled = DEBUG_ENABLED
-
-        # demo attributes
-        self.panda_to_gym = np.array([-0.6919, -0.7441, -0.3,  0, 0, 0, 1]) # [panda -> gym] trasformation
-        self.phase = 0                                                      # 0=finish, 1=pre-grasp, 2=grasp, 3=place
-        self.last_phase = self.phase
+    def __init__(self, max_episode_steps):
+        # attributes
+        self.max_episode_steps = max_episode_steps
+        self.phase = 0    # 0=finish, 1=pre-grasp, 2=grasp, 3=post-grasp
         self.timer = 0
         self.phase_change_delay = 1                      # [sec]
-        self.obj_width = 0.04                            # [m]
+        
         self.approach_position_tollerance      = 0.031   # [m]
         self.approach_orientation_tollerance   = 0.005   # [m]
-        self.manipulate_position_tollerance    = 0.031   # [m]
+        self.manipulate_position_tollerance    = 0.020   # [m]
         self.manipulate_orientation_tollerance = 0.005   # [m]
         self.retract_position_tollerance       = 0.031   # [m]
         self.retract_orientation_tollerance    = 0.005   # [m]
 
         # load ai
         self._loadAI()
-
-        # create gym environment
-        self.env = gym.make(self.args.env_name, render=True)
     
-
-    def process_inputs(self, o, g, o_mean, o_std, g_mean, g_std, args):
-        o_clip = np.clip(o, -args.clip_obs, args.clip_obs)
-        g_clip = np.clip(g, -args.clip_obs, args.clip_obs)
-        o_norm = np.clip((o_clip - o_mean) / (o_std), -args.clip_range, args.clip_range)
-        g_norm = np.clip((g_clip - g_mean) / (g_std), -args.clip_range, args.clip_range)
-        inputs = np.concatenate([o_norm, g_norm])
-        inputs = torch.tensor(inputs, dtype=torch.float32)
-        return inputs
-                
-    
-    def _debugPrint(self, msg, color='FG_DEFAULT'):
-        if self.debug_enabled: 
-            print_col(msg, color)
-
 
     def _loadAI(self):
         # get arguments
@@ -75,7 +52,7 @@ class PandaActor():
         model_path_manipulate = "ai/" + self.args.save_dir + self.args.env_name + '/manipulate.pt'
         self.o_mean_manipulate, self.o_std_manipulate, self.g_mean_manipulate, self.g_std_manipulate, model_manipulate = torch.load(model_path_manipulate, map_location=lambda storage, loc: storage)
         
-        # load place model [place]
+        # load post-grasp model [retract]
         model_path_retract = "ai/" + self.args.save_dir + self.args.env_name + '/retract.pt'
         self.o_mean_retract, self.o_std_retract, self.g_mean_retract, self.g_std_retract, model_retract = torch.load(model_path_retract, map_location=lambda storage, loc: storage)
         
@@ -99,11 +76,130 @@ class PandaActor():
         self.actor_network_retract.eval()
 
 
-    def reset(self):
+    def _process_inputs(self, o, g, o_mean, o_std, g_mean, g_std, args):
+        o_clip = np.clip(o, -args.clip_obs, args.clip_obs)
+        g_clip = np.clip(g, -args.clip_obs, args.clip_obs)
+        o_norm = np.clip((o_clip - o_mean) / (o_std), -args.clip_range, args.clip_range)
+        g_norm = np.clip((g_clip - g_mean) / (g_std), -args.clip_range, args.clip_range)
+        inputs = np.concatenate([o_norm, g_norm])
+        inputs = torch.tensor(inputs, dtype=torch.float32)
+        return inputs
+                
+    
+    def reset(self, goal_pose, objOnStart_pose, preGrasp_pose):
         # reset attributes
         self.phase = 1
-        self.last_phase = self.phase
         self.timer = 0
+
+        # get goal pose
+        self.goal_pose = goal_pose
+
+        # get object pose on start
+        self.objOnStart_pose = objOnStart_pose
+        
+        # generate pre_grasp pose
+        self.preGrasp_pose = preGrasp_pose  
+
+
+    def getAction(self, obs, current_pose, current_gripper):
+        action = self._policy(obs, current_pose, current_gripper)
+        self.timer += 1
+        return action
+
+
+    def _policy(self, obs, current_pose, current_gripper):
+        # PRE-GRASP
+        if self.phase == 1:
+            if self.timer <= 20 and \
+                (np.linalg.norm(self.preGrasp_pose[:3] - current_pose[:3]) >= self.approach_position_tollerance or \
+                 np.linalg.norm(self.preGrasp_pose[3:] - current_pose[3:]) >= self.approach_orientation_tollerance): 
+                with torch.no_grad():
+                    input_tensor = self._process_inputs(obs, self.preGrasp_pose[:3], self.o_mean_approach, self.o_std_approach, self.g_mean_approach, self.g_std_approach, self.args)
+                    pi = self.actor_network_approach(input_tensor)
+                    action = pi.detach().cpu().numpy().squeeze()
+                    position = action[:3]
+                orientation = quaternion_multiply(current_pose[3:], self.preGrasp_pose[3:])
+                grip = [1] # open gripper
+                return np.append(np.append(position, orientation), grip) # action
+            else:
+                self.phase = 2
+                self.timer = 0
+                time.sleep(self.phase_change_delay)
+            
+        # GRASP
+        if self.phase == 2: 
+            if self.timer < self.max_episode_steps and \
+                (np.linalg.norm(self.objOnStart_pose[:3] - current_pose[:3]) >= self.manipulate_position_tollerance or \
+                 np.linalg.norm(self.objOnStart_pose[3:] - current_pose[3:]) >= self.manipulate_orientation_tollerance):
+                with torch.no_grad():
+                    input_tensor = self._process_inputs(obs, self.objOnStart_pose[:3], self.o_mean_manipulate, self.o_std_manipulate, self.g_mean_manipulate, self.g_std_manipulate, self.args)
+                    pi = self.actor_network_manipulate(input_tensor)
+                    action = pi.detach().cpu().numpy().squeeze()
+                    position = action[:3]
+                orientation = quaternion_multiply(current_pose[3:], self.objOnStart_pose[3:])
+                grip = [1] # open gripper
+                return np.append(np.append(position, orientation), grip) # action
+            else:
+                self.phase = 3
+                self.timer = 0
+                time.sleep(self.phase_change_delay)
+   
+        # POST-GRASP
+        if self.phase == 3:
+            if self.timer < self.max_episode_steps and \
+                (np.linalg.norm(self.goal_pose[:3] - current_pose[:3]) >= self.retract_position_tollerance or \
+                 np.linalg.norm(self.goal_pose[3:] - current_pose[3:]) >= self.retract_orientation_tollerance): 
+                with torch.no_grad():
+                    input_tensor = self._process_inputs(obs, self.goal_pose[:3], self.o_mean_retract, self.o_std_retract, self.g_mean_retract, self.g_std_retract, self.args)
+                    pi = self.actor_network_retract(input_tensor)
+                    action = pi.detach().cpu().numpy().squeeze()
+                    position = action[:3]
+                orientation = quaternion_multiply(current_pose[3:], self.goal_pose[3:])
+                grip = [-1] # close gripper
+                return np.append(np.append(position, orientation), grip) # action
+            else:
+                self.phase = 0
+                time.sleep(self.phase_change_delay)
+
+
+        # FINISH
+        if self.phase == 0:
+            return np.array([0., 0., 0.,  0., 0., 0., 1.,  1]) # action
+
+
+    def getPhase(self):
+        return self.phase
+
+
+    def goalIsAchieved(self):
+        return self.phase == 0
+
+
+
+class PandaEnvironment():
+    """GLOBAL BEHAVIOUR"""
+    def __init__(self, DEBUG_ENABLED):
+        # attributes
+        self.panda_to_gym = np.array([-0.6919, -0.7441, -0.3,  0, 0, 0, 1]) # [panda -> gym] trasformation
+        self.debug_enabled = DEBUG_ENABLED
+        self.last_phase = 0
+        self.obj_width = 0.04                            # [m]
+
+        # create gym environment
+        self.env = gym.make("PandaPickAndPlace-v0", render=True)
+
+        # create actor
+        self.actor = PandaActor(self.env._max_episode_steps)
+                    
+    
+    def _debugPrint(self, msg, color='FG_DEFAULT'):
+        if self.debug_enabled: 
+            print_col(msg, color)
+
+
+    def reset(self):
+        # reset attributes
+        self.last_phase = 1
 
         # reset environment
         observation = self.env.reset()
@@ -122,8 +218,11 @@ class PandaActor():
         self.preGrasp_pose = self.objOnStart_pose.copy()
         self.preGrasp_pose[2] += 0.031  # [m] above the obj
 
+        # reset attributes
+        self.actor.reset(self.goal_pose, self.objOnStart_pose, self.preGrasp_pose)
+
         # get observation
-        self._gym_obs(observation)
+        self._getObs(observation)
 
         # return start behaviour
         return ([0.6014990053878944, 1.5880450818915202e-06, 0.29842061906465916,  \
@@ -131,7 +230,7 @@ class PandaActor():
                 0.08) # open gripper
 
     
-    def _gym_obs(self, observation):
+    def _getObs(self, observation):
         # get current tcp pose
         current_posit = observation["observation"][:3]             # grip_pos
         current_orien = [0, 0, 0, 1]
@@ -155,7 +254,7 @@ class PandaActor():
         self.obs[23:25] = 0                         # gripper_vel
 
         # adjust object_pos info for retract-ai (It use object_pos as current_pose info)
-        if self.phase == 3:
+        if self.actor.getPhase() == 3:
             self.obs[3:6] = self.current_pose[:3]   # object_pos
 
 
@@ -163,7 +262,25 @@ class PandaActor():
         self.env.render()
 
         # get action
-        self._policy()
+        self.action = self.actor.getAction(self.obs, self.current_pose, self.current_gripper)
+
+        # generate gripper state
+        if self.actor.getPhase() == 2 and self.last_phase == 1:
+            self._debugPrint("PRE-GRASP: successful", 'FG_YELLOW_BRIGHT')
+
+        if self.actor.getPhase() == 3 and self.last_phase == 2:
+            self._debugPrint("GRASP: successful", 'FG_YELLOW_BRIGHT')
+            gripper_state = self.obj_width    # close gripper after grasp phase
+
+        elif self.actor.getPhase() == 0 and self.last_phase == 3:
+            self._debugPrint("POST-GRASP: successful", 'FG_YELLOW_BRIGHT')
+            gripper_state = 0.08              # open gripper after post-grasp phase
+
+        else:
+            gripper_state = 0                 # no operation
+
+
+        # process action
         action = self.action.copy()
         action[:3] *= 0.05  # Correct with panda-gym (limit maximum change in position)
 
@@ -175,93 +292,20 @@ class PandaActor():
         self._debugPrint("Current pose: {}".format(current_pose.tolist()), 'FG_WHITE')
         self._debugPrint("Target pose: {}\n".format(target_pose.tolist()), 'FG_WHITE')
 
-        # generate gripper state
-        if self.phase == 3 and self.last_phase == 2:    # close gripper after grasp phase
-            gripper_state = self.obj_width
-
-        elif self.phase == 0 and self.last_phase == 3:  # open gripper after place phase
-            gripper_state = 0.08
-
-        else:
-            gripper_state = 0                           # no operation
-
-        self.last_phase = self.phase                    # update last_phase
+        self.last_phase = self.actor.getPhase()         # update last_phase
 
         return (target_pose.tolist(), gripper_state)
 
-
-    def _policy(self):
-        # PRE-GRASP
-        if self.phase == 1:
-            if self.timer <= 20 and \
-                (np.linalg.norm(self.preGrasp_pose[:3] - self.current_pose[:3]) >= self.approach_position_tollerance or \
-                 np.linalg.norm(self.preGrasp_pose[3:] - self.current_pose[3:]) >= self.approach_orientation_tollerance): 
-                with torch.no_grad():
-                    input_tensor = self.process_inputs(self.obs, self.preGrasp_pose[:3], self.o_mean_approach, self.o_std_approach, self.g_mean_approach, self.g_std_approach, self.args)
-                    pi = self.actor_network_approach(input_tensor)
-                    action = pi.detach().cpu().numpy().squeeze()
-                    position = action[:3]
-                orientation = quaternion_multiply(self.current_pose[3:], self.preGrasp_pose[3:])
-                grip = [1] # open gripper
-                self.action = np.append(np.append(position, orientation), grip)
-            else:
-                self.phase = 2
-                self.timer = 0
-                time.sleep(self.phase_change_delay)
-                self._debugPrint("PRE-GRASP: successful", 'FG_YELLOW_BRIGHT')
-            
-        # GRASP
-        if self.phase == 2: 
-            if self.timer < self.env._max_episode_steps and \
-                (np.linalg.norm(self.objOnStart_pose[:3] - self.current_pose[:3]) >= self.manipulate_position_tollerance or \
-                 np.linalg.norm(self.objOnStart_pose[3:] - self.current_pose[3:]) >= self.manipulate_orientation_tollerance):
-                with torch.no_grad():
-                    input_tensor = self.process_inputs(self.obs, self.objOnStart_pose[:3], self.o_mean_manipulate, self.o_std_manipulate, self.g_mean_manipulate, self.g_std_manipulate, self.args)
-                    pi = self.actor_network_manipulate(input_tensor)
-                    action = pi.detach().cpu().numpy().squeeze()
-                    position = action[:3]
-                orientation = quaternion_multiply(self.current_pose[3:], self.objOnStart_pose[3:])
-                grip = [1] # open gripper
-                self.action = np.append(np.append(position, orientation), grip)
-            else:
-                self.phase = 3
-                self.timer = 0
-                time.sleep(self.phase_change_delay)
-                self._debugPrint("GRASP: successful", 'FG_YELLOW_BRIGHT')
    
-        # PLACE
-        if self.phase == 3:
-            if self.timer < self.env._max_episode_steps and \
-                (np.linalg.norm(self.goal_pose[:3] - self.current_pose[:3]) >= self.retract_position_tollerance or \
-                 np.linalg.norm(self.goal_pose[3:] - self.current_pose[3:]) >= self.retract_orientation_tollerance): 
-                with torch.no_grad():
-                    input_tensor = self.process_inputs(self.obs, self.goal_pose[:3], self.o_mean_retract, self.o_std_retract, self.g_mean_retract, self.g_std_retract, self.args)
-                    pi = self.actor_network_retract(input_tensor)
-                    action = pi.detach().cpu().numpy().squeeze()
-                    position = action[:3]
-                orientation = quaternion_multiply(self.current_pose[3:], self.goal_pose[3:])
-                grip = [-1] # close gripper
-                self.action = np.append(np.append(position, orientation), grip)
-            else:
-                self.phase = 0
-                time.sleep(self.phase_change_delay)
-                self._debugPrint("POST-GRASP: successful", 'FG_YELLOW_BRIGHT')
-
-        # FINISH
-        if self.phase == 0:
-            self.action = np.array([0., 0., 0.,  0., 0., 0., 1.,  1]) # open gripper
-
-        
     def step(self):
         pos = self.action[:3].tolist()
         grip = [self.action[7]]
         observation, reward, done, self.info = self.env.step(pos + grip)
-        self._gym_obs(observation)
-        self.timer += 1
+        self._getObs(observation)
 
 
     def checkGoal(self):
-        if self.phase == 0:
+        if self.actor.goalIsAchieved():
             # get statistics
             goal_pose  = transform(self.panda_to_gym, self.goal_pose)
             end_pose = transform(self.panda_to_gym, self.current_pose)
@@ -282,12 +326,13 @@ class PandaActor():
 
 
 
+
 def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENABLED):
     # for writing
     trajectory = list()
 
     # initialize Actor
-    my_actor = PandaActor(DEBUG_ENABLED)
+    my_actor = PandaEnvironment(DEBUG_ENABLED)
 
     # statistics
     results = {
@@ -376,11 +421,11 @@ def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENABLED):
 
 if __name__ == "__main__":
     DEBUG_ENABLED = False
-    NUM_EPISODES = 10
+    NUM_EPISODES = 2
     LEN_EPISODE = 150
-    WRITE_ENABLE = False
+    WRITE_ENABLE = True
     # FILE_NAME = "trajectory_" + datetime.today().strftime('%Y-%m-%d-%H:%M:%S')
-    FILE_NAME = "trajectory"
+    FILE_NAME = "trajectory_test2"
            
 
     file_path = os.path.join(os.path.dirname(__file__), "../data/trajectories/" + FILE_NAME + ".txt")
