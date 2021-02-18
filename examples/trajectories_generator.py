@@ -21,17 +21,6 @@ import os
 
 
 
-def process_inputs(o, g, o_mean, o_std, g_mean, g_std, args):
-    o_clip = np.clip(o, -args.clip_obs, args.clip_obs)
-    g_clip = np.clip(g, -args.clip_obs, args.clip_obs)
-    o_norm = np.clip((o_clip - o_mean) / (o_std), -args.clip_range, args.clip_range)
-    g_norm = np.clip((g_clip - g_mean) / (g_std), -args.clip_range, args.clip_range)
-    inputs = np.concatenate([o_norm, g_norm])
-    inputs = torch.tensor(inputs, dtype=torch.float32)
-    return inputs
-
-
-
 class PandaActor():
     """GLOBAL BEHAVIOUR"""
     def __init__(self, DEBUG_ENABLED):
@@ -39,19 +28,35 @@ class PandaActor():
         self.debug_enabled = DEBUG_ENABLED
 
         # demo attributes
-        self.timeStep = 0
-        self.phase = 0                                                      # 0=finish, 1=pre-grasp, 2=grasp, 3=place
         self.panda_to_gym = np.array([-0.6919, -0.7441, -0.3,  0, 0, 0, 1]) # [panda -> gym] trasformation
-        self.obj_width = 0.04             # [m]
-        self.phase_change_delay = 1       # [sec]
+        self.phase = 0                                                      # 0=finish, 1=pre-grasp, 2=grasp, 3=place
         self.last_phase = self.phase
+        self.timer = 0
+        self.phase_change_delay = 1                      # [sec]
+        self.obj_width = 0.04                            # [m]
+        self.approach_position_tollerance      = 0.031   # [m]
+        self.approach_orientation_tollerance   = 0.005   # [m]
+        self.manipulate_position_tollerance    = 0.031   # [m]
+        self.manipulate_orientation_tollerance = 0.005   # [m]
+        self.retract_position_tollerance       = 0.031   # [m]
+        self.retract_orientation_tollerance    = 0.005   # [m]
 
         # load ai
         self._loadAI()
 
         # create gym environment
         self.env = gym.make(self.args.env_name, render=True)
-            
+    
+
+    def process_inputs(self, o, g, o_mean, o_std, g_mean, g_std, args):
+        o_clip = np.clip(o, -args.clip_obs, args.clip_obs)
+        g_clip = np.clip(g, -args.clip_obs, args.clip_obs)
+        o_norm = np.clip((o_clip - o_mean) / (o_std), -args.clip_range, args.clip_range)
+        g_norm = np.clip((g_clip - g_mean) / (g_std), -args.clip_range, args.clip_range)
+        inputs = np.concatenate([o_norm, g_norm])
+        inputs = torch.tensor(inputs, dtype=torch.float32)
+        return inputs
+                
     
     def _debugPrint(self, msg, color='FG_DEFAULT'):
         if self.debug_enabled: 
@@ -98,7 +103,7 @@ class PandaActor():
         # reset attributes
         self.phase = 1
         self.last_phase = self.phase
-        self.timeStep = 0
+        self.timer = 0
 
         # reset environment
         observation = self.env.reset()
@@ -188,11 +193,11 @@ class PandaActor():
     def _policy(self):
         # PRE-GRASP
         if self.phase == 1:
-            if self.timeStep <= 20 and \
-                (np.linalg.norm(self.preGrasp_pose[:3] - self.current_pose[:3]) >= 0.031 or \
-                 np.linalg.norm(self.preGrasp_pose[3:] - self.current_pose[3:]) >= 0.005): 
+            if self.timer <= 20 and \
+                (np.linalg.norm(self.preGrasp_pose[:3] - self.current_pose[:3]) >= self.approach_position_tollerance or \
+                 np.linalg.norm(self.preGrasp_pose[3:] - self.current_pose[3:]) >= self.approach_orientation_tollerance): 
                 with torch.no_grad():
-                    input_tensor = process_inputs(self.obs, self.preGrasp_pose[:3], self.o_mean_approach, self.o_std_approach, self.g_mean_approach, self.g_std_approach, self.args)
+                    input_tensor = self.process_inputs(self.obs, self.preGrasp_pose[:3], self.o_mean_approach, self.o_std_approach, self.g_mean_approach, self.g_std_approach, self.args)
                     pi = self.actor_network_approach(input_tensor)
                     action = pi.detach().cpu().numpy().squeeze()
                     position = action[:3]
@@ -201,17 +206,17 @@ class PandaActor():
                 self.action = np.append(np.append(position, orientation), grip)
             else:
                 self.phase = 2
-                self.timeStep = 0
+                self.timer = 0
                 time.sleep(self.phase_change_delay)
                 self._debugPrint("PRE-GRASP: successful", 'FG_YELLOW_BRIGHT')
             
         # GRASP
         if self.phase == 2: 
-            if self.timeStep < self.env._max_episode_steps and \
-                (np.linalg.norm(self.objOnStart_pose[:3] - self.current_pose[:3]) >= 0.015 or \
-                 np.linalg.norm(self.objOnStart_pose[3:] - self.current_pose[3:]) >= 0.005):
+            if self.timer < self.env._max_episode_steps and \
+                (np.linalg.norm(self.objOnStart_pose[:3] - self.current_pose[:3]) >= self.manipulate_position_tollerance or \
+                 np.linalg.norm(self.objOnStart_pose[3:] - self.current_pose[3:]) >= self.manipulate_orientation_tollerance):
                 with torch.no_grad():
-                    input_tensor = process_inputs(self.obs, self.objOnStart_pose[:3], self.o_mean_manipulate, self.o_std_manipulate, self.g_mean_manipulate, self.g_std_manipulate, self.args)
+                    input_tensor = self.process_inputs(self.obs, self.objOnStart_pose[:3], self.o_mean_manipulate, self.o_std_manipulate, self.g_mean_manipulate, self.g_std_manipulate, self.args)
                     pi = self.actor_network_manipulate(input_tensor)
                     action = pi.detach().cpu().numpy().squeeze()
                     position = action[:3]
@@ -220,17 +225,17 @@ class PandaActor():
                 self.action = np.append(np.append(position, orientation), grip)
             else:
                 self.phase = 3
-                self.timeStep = 0
+                self.timer = 0
                 time.sleep(self.phase_change_delay)
                 self._debugPrint("GRASP: successful", 'FG_YELLOW_BRIGHT')
    
         # PLACE
         if self.phase == 3:
-            if self.timeStep < self.env._max_episode_steps and \
-                (np.linalg.norm(self.goal_pose[:3] - self.current_pose[:3]) >= 0.031 or \
-                 np.linalg.norm(self.goal_pose[3:] - self.current_pose[3:]) >= 0.005): 
+            if self.timer < self.env._max_episode_steps and \
+                (np.linalg.norm(self.goal_pose[:3] - self.current_pose[:3]) >= self.retract_position_tollerance or \
+                 np.linalg.norm(self.goal_pose[3:] - self.current_pose[3:]) >= self.retract_orientation_tollerance): 
                 with torch.no_grad():
-                    input_tensor = process_inputs(self.obs, self.goal_pose[:3], self.o_mean_retract, self.o_std_retract, self.g_mean_retract, self.g_std_retract, self.args)
+                    input_tensor = self.process_inputs(self.obs, self.goal_pose[:3], self.o_mean_retract, self.o_std_retract, self.g_mean_retract, self.g_std_retract, self.args)
                     pi = self.actor_network_retract(input_tensor)
                     action = pi.detach().cpu().numpy().squeeze()
                     position = action[:3]
@@ -252,11 +257,24 @@ class PandaActor():
         grip = [self.action[7]]
         observation, reward, done, self.info = self.env.step(pos + grip)
         self._gym_obs(observation)
-        self.timeStep += 1
+        self.timer += 1
 
 
     def checkGoal(self):
-        return (self.phase == 0, self.info['is_success'])
+        if self.phase == 0:
+            # get statistics
+            goal_pose  = transform(self.panda_to_gym, self.goal_pose)
+            end_pose = transform(self.panda_to_gym, self.current_pose)
+            
+            stats = dict()
+            stats['position_error'] = np.linalg.norm(goal_pose[:3] - end_pose[:3])
+            stats['orientation_error'] = np.linalg.norm(goal_pose[3:] - end_pose[3:])
+            stats['gym_success'] = self.info['is_success']
+            return (True, stats)
+            
+        else:
+            return (False, None)
+
 
 
     def __del__(self):
@@ -274,7 +292,10 @@ def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENABLED):
 
     # statistics
     results = {
-        'successes': 0,
+        'goalsAchived': 0,
+        'gym_successes': 0,
+        'position_errors': list(),
+        'orientation_errors': list(),
         'steps': list()
     }
 
@@ -291,7 +312,7 @@ def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENABLED):
         trajectory.append(target_pose)
         
         # start episode
-        for time_step in range(LEN_EPISODE):
+        for timer in range(LEN_EPISODE):
             # generate a new action from observations and create a target pose with it
             (target_pose, gripper_state)  = my_actor.getTargetInfo()
 
@@ -304,17 +325,21 @@ def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENABLED):
             my_actor.step()
 
             # check goal
-            (exit, success) = my_actor.checkGoal()
+            (goal_achived, stats) = my_actor.checkGoal()
 
             # check the output condition
-            if exit:
-                if success:
-                    results['successes'] += 1
-                    print_col("[Episode {}] Goal achived in {} steps".format(episode, time_step + 1), 'FG_GREEN_BRIGHT')
-                else:
-                    print_col("[Episode {}] Goal not achived in {} steps".format(episode, time_step + 1), 'FG_RED_BRIGHT')
-                results['steps'].append(time_step + 1)
+            if goal_achived:
+                results['goalsAchived'] += 1
+                results['gym_successes'] += stats['gym_success']
+                results['position_errors'].append(stats['position_error'])
+                results['orientation_errors'].append(stats['orientation_error'])
+                results['steps'].append(timer + 1)
                 break
+
+        if goal_achived:
+            print_col("[Episode {}] Goal achived in {} steps".format(episode, timer + 1), 'FG_GREEN_BRIGHT')
+        else:
+            print_col("[Episode {}] Goal not achived in {} steps".format(episode, timer + 1), 'FG_RED_BRIGHT')
         
         # write to file
         if WRITE_ENABLE and input("Write to file? [y/n] ") == 'y':
@@ -335,7 +360,8 @@ def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENABLED):
     print("-----------------------------------")
     print_col("All Episodes finish", 'FG_GREEN')
 
-    successes = results['successes']
+    successes = results['goalsAchived']
+    # successes = results['gym_successes']
     fails = NUM_EPISODES - successes
     print_col("accuracy: {}%".format(successes / float(NUM_EPISODES) * 100.0), 'FG_YELLOW_BRIGHT')
     print_col("  - episodes:  {}".format(colorize(str(NUM_EPISODES), 'FG_WHITE')),        'FG_WHITE')
@@ -343,13 +369,15 @@ def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENABLED):
     print_col("  - fails:     {}".format(colorize(str(fails),        'FG_RED_BRIGHT')),   'FG_WHITE')
     
     if successes > 0:
-        print_col("Mean steps: {}\n".format(np.mean(results['steps'])), 'FG_YELLOW_BRIGHT')
+        print_col("Mean position errors:    {}"  .format(np.mean(results['position_errors'])), 'FG_YELLOW_BRIGHT')
+        print_col("Mean orientation errors: {}"  .format(np.mean(results['orientation_errors'])), 'FG_YELLOW_BRIGHT')
+        print_col("Mean steps:              {}\n".format(np.mean(results['steps'])), 'FG_YELLOW_BRIGHT')
 
 
 
 if __name__ == "__main__":
     DEBUG_ENABLED = False
-    NUM_EPISODES = 1
+    NUM_EPISODES = 10
     LEN_EPISODE = 150
     WRITE_ENABLE = False
     # FILE_NAME = "trajectory_" + datetime.today().strftime('%Y-%m-%d-%H:%M:%S')
