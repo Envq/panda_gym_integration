@@ -276,7 +276,6 @@ class PandaActor():
             return (False, None)
 
 
-
     def __del__(self):
         # close gym environment
         self.env.close()
