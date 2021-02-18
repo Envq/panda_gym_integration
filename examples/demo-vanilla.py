@@ -1,6 +1,6 @@
 import torch
-from rl_modules.models import actor
-from rl_modules.arguments import get_args
+from ai.models import actor
+from ai.arguments import get_args
 import gym
 import panda_gym
 import numpy as np
@@ -19,12 +19,15 @@ def process_inputs(o, g, o_mean, o_std, g_mean, g_std, args):
 if __name__ == '__main__':
     args = get_args()
     # load the model param
-    model_path_approach = args.save_dir + args.env_name + '/approach.pt'
+    model_path_approach = "ai/" + args.save_dir + args.env_name + '/approach.pt'
     o_mean_approach, o_std_approach, g_mean_approach, g_std_approach, model_approach = torch.load(model_path_approach, map_location=lambda storage, loc: storage)
-    model_path_manipulate = args.save_dir + args.env_name + '/manipulate.pt'
+    
+    model_path_manipulate = "ai/" + args.save_dir + args.env_name + '/manipulate.pt'
     o_mean_manipulate, o_std_manipulate, g_mean_manipulate, g_std_manipulate, model_manipulate = torch.load(model_path_manipulate, map_location=lambda storage, loc: storage)
-    model_path_retract = args.save_dir + args.env_name + '/retract.pt'
+    
+    model_path_retract = "ai/" + args.save_dir + args.env_name + '/retract.pt'
     o_mean_retract, o_std_retract, g_mean_retract, g_std_retract, model_retract = torch.load(model_path_retract, map_location=lambda storage, loc: storage)
+    
     # create the environment
     env = gym.make(args.env_name, render = True)
     # get the env param
@@ -35,7 +38,6 @@ if __name__ == '__main__':
                   'action': env.action_space.shape[0], 
                   'action_max': env.action_space.high[0],
                   }
-    print("ENV: ", env._max_episode_steps)
     # create the actor network
     actor_network_approach = actor(env_params)
     actor_network_approach.load_state_dict(model_approach)

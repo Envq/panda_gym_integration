@@ -52,7 +52,6 @@ CATKIN_IGNORE
 
 
 **/__pycache__/
-examples/*.txt
 examples/panda_gym/
 venv-panda/
 

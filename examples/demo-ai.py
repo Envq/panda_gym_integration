@@ -14,8 +14,8 @@ import time
 import gym
 import panda_gym
 import torch
-from rl_modules.models import actor
-from rl_modules.arguments import get_args
+from ai.models import actor
+from ai.arguments import get_args
 
 
 
@@ -47,10 +47,6 @@ class PandaActor():
         self.phase = 0  # 1=pre-grasp, 2=grasp, 3=close, 4=place
         self.steps_performed = 0
 
-        # trajectory file handlers
-        # self.file_reader = open("trajectory.txt", 'r')
-        # self.file_writer = open("trajectory.txt", 'w')
-
         # results lists
         self.results = {
             'position_errors': list(),
@@ -62,13 +58,6 @@ class PandaActor():
         # initialize
         if MODE == "real":
             self._robot_init(HOST, PORT)
-            # self.trajectory = list()
-            # for line in self.file_reader:
-            #     components = line.split()
-            #     target_pose = list()
-            #     for e in components:
-            #         target_pose.append(e)
-            #     self.trajectory.append(target_pose)
 
         elif MODE == "sim":
             self._gym_init("PandaPickAndPlace-v0", True)
@@ -162,13 +151,7 @@ class PandaActor():
         if MODE == "sim":
             self.env.render()
             self.target_pose = transform(transform(self.panda_to_gym, self.current_pose), action[:7])
-            self.target_gripper = action[7]
-
-            # add target point to trajectory
-            # for e in self.target_pose.tolist():
-            #     self.file_writer.write("{}  ".format(e))
-            # self.file_writer.write("\n")
-            
+            self.target_gripper = action[7]            
 
         elif MODE == "real":
             self.target_pose = transform(self.current_pose, action[:7])
@@ -216,15 +199,15 @@ class PandaActor():
         self.args = get_args()
 
         # load pre-grasp model [approach]
-        model_path_approach = self.args.save_dir + self.args.env_name + '/approach.pt'
+        model_path_approach = "ai/" + self.args.save_dir + self.args.env_name + '/approach.pt'
         self.o_mean_approach, self.o_std_approach, self.g_mean_approach, self.g_std_approach, model_approach = torch.load(model_path_approach, map_location=lambda storage, loc: storage)
         
         # load grasp model [manipulate]
-        model_path_manipulate = self.args.save_dir + self.args.env_name + '/manipulate.pt'
+        model_path_manipulate = "ai/" + self.args.save_dir + self.args.env_name + '/manipulate.pt'
         self.o_mean_manipulate, self.o_std_manipulate, self.g_mean_manipulate, self.g_std_manipulate, model_manipulate = torch.load(model_path_manipulate, map_location=lambda storage, loc: storage)
         
         # load place model [place]
-        model_path_retract = self.args.save_dir + self.args.env_name + '/retract.pt'
+        model_path_retract = "ai/" + self.args.save_dir + self.args.env_name + '/retract.pt'
         self.o_mean_retract, self.o_std_retract, self.g_mean_retract, self.g_std_retract, model_retract = torch.load(model_path_retract, map_location=lambda storage, loc: storage)
         
         # get the environment params
