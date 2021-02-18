@@ -124,6 +124,7 @@ if __name__ == '__main__':
             observation_new, reward, _, info = env.step(actions)
             obs = observation_new['observation']
             grip_pos = obs[:3]
+            obs[3:6] = grip_pos.copy()
             obs[6:9]= 0
             obs[11:]= 0
     
