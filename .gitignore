@@ -53,6 +53,7 @@ CATKIN_IGNORE
 
 **/__pycache__/
 examples/panda_gym/
+data/trajectories/trajectory_*.txt
 venv-panda/
 
 demo-ai/

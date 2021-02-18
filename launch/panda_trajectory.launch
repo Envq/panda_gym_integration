@@ -1,0 +1,8 @@
+<launch>
+      <node pkg="panda_gym_integration" 
+            type="panda_trajectory.py" 
+            name="panda_trajectory_node" 
+            respawn="false" 
+            output="screen">
+      </node>
+</launch>

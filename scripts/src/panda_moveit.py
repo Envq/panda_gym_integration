@@ -251,8 +251,17 @@ class PandaMoveitInterface(object):
         print("GRASPING...")
       return True
     return False
-    
 
+
+  def execute_cartesian_path(self, waypoints, eef_step = 0.01, jump_threashould = 0.0):
+    # Generate planning
+    (plan, fraction) = self.arm.compute_cartesian_path(
+                                      waypoints,        # waypoints to follow
+                                      eef_step,         # interpolation
+                                      jump_threashould) # jump_threshold -> with 0 not check invalid jumps in joint space
+    # Execute planning
+    self.arm.execute(plan, wait=True)
+  
 
 
 def test1(sys):
@@ -441,6 +450,5 @@ def test2(sys):
 if __name__ == '__main__':
   """TEST"""
   import sys
-  # test1(sys)
-  test2(sys)
-  
+  test1(sys)
+  # test2(sys)

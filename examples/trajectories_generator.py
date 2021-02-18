@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
 
+# Panda Interface
 import sys
 sys.path.append("../scripts/")
-
-# Panda Interface
 from src.utils import quaternion_multiply, transform
 from src.colors import print_col, colorize
-import numpy as np
-import time
-from datetime import datetime
 
 # Panda-gym and AI
 import gym
@@ -16,6 +12,12 @@ import panda_gym
 import torch
 from ai.models import actor
 from ai.arguments import get_args
+
+# Other
+import numpy as np
+import time
+from datetime import datetime
+import os
 
 
 
@@ -121,14 +123,16 @@ class PandaActor():
         action = self.actions.copy()
         action[:3] *= 0.05  # Correct with panda-gym (limit maximum change in position)
 
-        target = [0, 0, 0]
-        for i in range(len(target)):
-            target[i] = self.panda_to_gym[i] + self.current_pose[i] + action[i]
+        target_posit = [0, 0, 0]
+        for i in range(len(target_posit)):
+            target_posit[i] = self.panda_to_gym[i] + self.current_pose[i] + action[i]
+        
+        target_orien = [0, 0, 0, 1]
 
         target_gripper = self.obj_width if action[3] < 0 else 0.08
         grasp =                       1 if action[3] < 0 else 0
 
-        return target + [target_gripper, grasp]
+        return target_posit + target_orien + [target_gripper, grasp]
 
 
     def _policy(self):
@@ -190,7 +194,7 @@ class PandaActor():
 
 
 
-def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, TRAJECTORIES_FOLDER):
+def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH):
     # for writing
     trajectory = list()
 
@@ -237,8 +241,7 @@ def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, TRAJECTORIES_FOLDER):
         
         # write to file
         if WRITE_ENABLE and input("Write to file? [y/n] ") == 'y':
-            file_name = TRAJECTORIES_FOLDER + "/trajectory_" + datetime.today().strftime('%Y-%m-%d-%H:%M:%S') + 'txt'
-            with open(file_name, 'w') as file_writer:
+            with open(FILE_PATH, 'w') as file_writer:
                 for info in trajectory:
                     for e in info:
                         file_writer.write("{:>25}  ".format(e))
@@ -264,7 +267,9 @@ def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, TRAJECTORIES_FOLDER):
 if __name__ == "__main__":
     NUM_EPISODES = 2
     LEN_EPISODE = 150
-    WRITE_ENABLE = False
-    TRAJECTORIES_FOLDER = "trajectories/"
+    WRITE_ENABLE = True
+    FILE_NAME = "trajectory_" + datetime.today().strftime('%Y-%m-%d-%H:%M:%S')
+           
 
-    main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, TRAJECTORIES_FOLDER)
+    file_path = os.path.join(os.path.dirname(__file__), "../data/trajectories/" + FILE_NAME + ".txt")
+    main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, file_path)
