@@ -36,10 +36,12 @@ class PandaActor():
     """GLOBAL BEHAVIOUR"""
     def __init__(self):
         # demo attributes
-        self.phase = 0          # 1=pre-grasp, 2=grasp, 3=close, 4=place
         self.timeStep = 0
-        self.panda_to_gym = np.array([-0.6919, -0.7441, -0.3]) # [panda -> gym] trasformation
-        self.obj_width = 0.04         # [m]
+        self.phase = 0                                                      # 0=finish, 1=pre-grasp, 2=grasp, 3=place
+        self.panda_to_gym = np.array([-0.6919, -0.7441, -0.3,  0, 0, 0, 1]) # [panda -> gym] trasformation
+        self.obj_width = 0.04                                               # [m]
+        self.last_phase = self.phase
+        self.phase_change_delay = 1   # [sec]
 
         # load ai
         self._loadAI()
@@ -87,6 +89,7 @@ class PandaActor():
     def reset(self):
         # reset attributes
         self.phase = 1
+        self.last_phase = self.phase
         self.timeStep = 0
 
         # reset environment
@@ -95,21 +98,36 @@ class PandaActor():
         # get observation
         self._gym_obs(observation)
 
-        # get scenario's goals
-        self.goal = observation["desired_goal"]             # goal place
-        self.objOnStart_pose = self.obs[3:6]                # goal grasp
-        self.preGrasp_pose = self.objOnStart_pose.copy()    # pre-goal grasp
-        self.preGrasp_pose[2] += 0.031                      # [m] above the obj
+        # get goal pose
+        goal_posit = observation["desired_goal"]
+        goal_orien = [0, 0, 0, 1]
+        self.goal_pose = np.concatenate((goal_posit, goal_orien), axis=None)
+
+        # get object pose on start
+        objOnStart_posit = observation["observation"][3:6]         # object_pos
+        objOnStart_orien = [0, 0, 0, 1]
+        self.objOnStart_pose = np.concatenate((objOnStart_posit, objOnStart_orien), axis=None)
+        
+        # generate pre_grasp pose
+        self.preGrasp_pose = self.objOnStart_pose.copy()
+        self.preGrasp_pose[2] += 0.031  # [m] above the obj
+
+        # return start behaviour
+        return ([0.6014990053878944, 1.5880450818915202e-06, 0.29842061906465916,  \
+                -3.8623752044513406e-06, -0.0013073068882995874, -5.91084615330739e-06, 0.9999991454490569], \
+                0.08) # open gripper
 
     
     def _gym_obs(self, observation):
         # get obs
         self.obs = observation["observation"]
-        self.obs[6:9]= 0
-        self.obs[11:]= 0
+        self.obs[6:9] = 0
+        self.obs[11:] = 0
 
         # get current tcp pose
-        self.current_pose = observation["observation"][:3]             # grip_pos
+        current_posit = observation["observation"][:3]             # grip_pos
+        current_orien = [0, 0, 0, 1]
+        self.current_pose = np.concatenate((current_posit, current_orien), axis=None)
 
         # get current gripper
         finger0 = observation["observation"][9]
@@ -118,68 +136,97 @@ class PandaActor():
 
 
     def getTargetInfo(self):
+        self.env.render()
+
         # get action
         self._policy()
-        action = self.actions.copy()
+        action = self.action.copy()
         action[:3] *= 0.05  # Correct with panda-gym (limit maximum change in position)
 
-        target_posit = [0, 0, 0]
-        for i in range(len(target_posit)):
-            target_posit[i] = self.panda_to_gym[i] + self.current_pose[i] + action[i]
-        
-        target_orien = [0, 0, 0, 1]
+        # generate target pose
+        target_pose = transform(transform(self.panda_to_gym, self.current_pose), action[:7])
 
-        target_gripper = self.obj_width if action[3] < 0 else 0.08
-        grasp =                       1 if action[3] < 0 else 0
+        # generate gripper state
+        if self.phase == 3 and self.last_phase == 2:    # close gripper after grasp phase
+            gripper_state = self.obj_width
 
-        return target_posit + target_orien + [target_gripper, grasp]
+        elif self.phase == 0 and self.last_phase == 3:  # open gripper after place phase
+            gripper_state = 0.08
+
+        else:
+            gripper_state = 0                           # no operation
+
+        self.last_phase = self.phase                    # update last_phase
+
+        return (target_pose.tolist(), gripper_state)
 
 
     def _policy(self):
         # PRE-GRASP
         if self.phase == 1:
-            if np.linalg.norm(self.current_pose - self.preGrasp_pose) >= 0.031 and self.timeStep <= 20:
-                self.env.render()
-                self.actions = [0, 0, 0, 0]
+            if self.timeStep <= 20 and \
+                (np.linalg.norm(self.current_pose[:3] - self.preGrasp_pose[:3]) >= 0.031 or \
+                 np.linalg.norm(self.preGrasp_pose[3:] - self.current_pose[3:]) >= 0.005): 
                 with torch.no_grad():
-                    input_tensor = process_inputs(self.obs, self.preGrasp_pose, self.o_mean_approach, self.o_std_approach, self.g_mean_approach, self.g_std_approach, self.args)
+                    input_tensor = process_inputs(self.obs, self.preGrasp_pose[:3], self.o_mean_approach, self.o_std_approach, self.g_mean_approach, self.g_std_approach, self.args)
                     pi = self.actor_network_approach(input_tensor)
-                    self.actions = pi.detach().cpu().numpy().squeeze()
-                self.actions[3] = 1
+                    action = pi.detach().cpu().numpy().squeeze()
+                    position = action[:3]
+                orientation = quaternion_multiply(self.current_pose[3:], self.preGrasp_pose[3:])
+                grip = [1] # open gripper
+                self.action = np.append(np.append(position, orientation), grip)
             else:
                 self.phase = 2
                 self.timeStep = 0
+                time.sleep(self.phase_change_delay)
+                # print_col("PRE-GRASP: successful", 'FG_YELLOW_BRIGHT')
             
         # GRASP
         if self.phase == 2: 
-            if np.linalg.norm(self.current_pose - self.objOnStart_pose) >= 0.015 and self.timeStep < self.env._max_episode_steps:
-                self.env.render()
-                self.actions = [0, 0, 0, 0]
+            if self.timeStep < self.env._max_episode_steps and \
+                (np.linalg.norm(self.current_pose[:3] - self.objOnStart_pose[:3]) >= 0.015 or \
+                 np.linalg.norm(self.objOnStart_pose[3:] - self.current_pose[3:]) >= 0.005):
                 with torch.no_grad():
-                    input_tensor = process_inputs(self.obs, self.objOnStart_pose, self.o_mean_manipulate, self.o_std_manipulate, self.g_mean_manipulate, self.g_std_manipulate, self.args)
+                    input_tensor = process_inputs(self.obs, self.objOnStart_pose[:3], self.o_mean_manipulate, self.o_std_manipulate, self.g_mean_manipulate, self.g_std_manipulate, self.args)
                     pi = self.actor_network_manipulate(input_tensor)
-                self.actions = pi.detach().cpu().numpy().squeeze()
-                self.actions[3] = 1
+                    action = pi.detach().cpu().numpy().squeeze()
+                    position = action[:3]
+                orientation = quaternion_multiply(self.current_pose[3:], self.objOnStart_pose[3:])
+                grip = [1] # open gripper
+                self.action = np.append(np.append(position, orientation), grip)
             else:
                 self.phase = 3
                 self.timeStep = 0
+                time.sleep(self.phase_change_delay)
+                # print_col("GRASP: successful", 'FG_YELLOW_BRIGHT')
    
         # PLACE
         if self.phase == 3:
-            if np.linalg.norm(self.goal - self.current_pose) >= 0.031 and self.timeStep < self.env._max_episode_steps:
-                self.env.render()
-                self.actions = [0, 0, 0, 0]                    
+            if self.timeStep < self.env._max_episode_steps and \
+                (np.linalg.norm(self.goal_pose[:3] - self.current_pose[:3]) >= 0.031 or \
+                 np.linalg.norm(self.goal_pose[3:] - self.current_pose[3:]) >= 0.005): 
                 with torch.no_grad():
-                    input_tensor = process_inputs(self.obs, self.goal, self.o_mean_retract, self.o_std_retract, self.g_mean_retract, self.g_std_retract, self.args)
+                    input_tensor = process_inputs(self.obs, self.goal_pose[:3], self.o_mean_retract, self.o_std_retract, self.g_mean_retract, self.g_std_retract, self.args)
                     pi = self.actor_network_retract(input_tensor)
-                    self.actions = pi.detach().cpu().numpy().squeeze()
-                self.actions[3] = -1
+                    action = pi.detach().cpu().numpy().squeeze()
+                    position = action[:3]
+                orientation = quaternion_multiply(self.current_pose[3:], self.goal_pose[3:])
+                grip = [-1] # close gripper
+                self.action = np.append(np.append(position, orientation), grip)
             else:
                 self.phase = 0
+                time.sleep(self.phase_change_delay)
+                # print_col("POST-GRASP: successful", 'FG_YELLOW_BRIGHT')
+
+        # FINISH
+        if self.phase == 0:
+            self.action = np.array([0., 0., 0.,  0., 0., 0., 1.,  1]) # open gripper
 
         
     def step(self):
-        observation, reward, done, self.info = self.env.step(self.actions)
+        pos = self.action[:3].tolist()
+        grip = [self.action[7]]
+        observation, reward, done, self.info = self.env.step(pos + grip)
         self._gym_obs(observation)
         self.timeStep += 1
 
@@ -210,18 +257,24 @@ def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH):
     # start world
     for episode in range(NUM_EPISODES):
         # reset actory
-        my_actor.reset()
+        (target_pose, gripper_state) = my_actor.reset()
 
         # reset trajectory
         trajectory.clear()
+
+        # add start pose
+        trajectory.append(gripper_state)
+        trajectory.append(target_pose)
         
         # start episode
         for time_step in range(LEN_EPISODE):
             # generate a new action from observations and create a target pose with it
-            target = my_actor.getTargetInfo()
+            (target_pose, gripper_state)  = my_actor.getTargetInfo()
 
-            # add target to trajectory
-            trajectory.append(target)
+            # add target to trajectory and gripper state
+            if gripper_state != 0:
+                trajectory.append(gripper_state)
+            trajectory.append(target_pose)
 
             # perform a step and get new observations
             my_actor.step()
@@ -243,9 +296,15 @@ def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH):
         if WRITE_ENABLE and input("Write to file? [y/n] ") == 'y':
             with open(FILE_PATH, 'w') as file_writer:
                 for info in trajectory:
-                    for e in info:
-                        file_writer.write("{:>25}  ".format(e))
-                    file_writer.write("\n")
+                    # target pose case
+                    if type(info) is list:
+                        for e in info:
+                            file_writer.write("{:>25}  ".format(e))
+                        file_writer.write("\n")
+
+                    # gripper state change case
+                    else:
+                        file_writer.write("{}\n".format(info))
     
 
     # Generate final statistics
@@ -265,10 +324,11 @@ def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH):
 
 
 if __name__ == "__main__":
-    NUM_EPISODES = 2
+    NUM_EPISODES = 1
     LEN_EPISODE = 150
     WRITE_ENABLE = True
     FILE_NAME = "trajectory_" + datetime.today().strftime('%Y-%m-%d-%H:%M:%S')
+    # FILE_NAME = "trajectory"
            
 
     file_path = os.path.join(os.path.dirname(__file__), "../data/trajectories/" + FILE_NAME + ".txt")

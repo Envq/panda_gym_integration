@@ -257,7 +257,7 @@ class PandaActor():
                 self.timer = 0
                 print_col("PRE-GRASP: successful", 'FG_YELLOW_BRIGHT')
                 time.sleep(self.phase_change_delay)
-
+                
         # GRASP
         if self.phase == 2: 
             if np.linalg.norm(self.objOnStart_pose[:3] - self.current_pose[:3]) >= 0.015 or \

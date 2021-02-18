@@ -2,9 +2,28 @@
 
 from src.panda_moveit import PandaMoveitInterface
 import sys, rospy, moveit_commander
-from geometry_msgs.msg import PoseStamped, Pose
+from geometry_msgs.msg import Pose
 import copy
 import os
+
+
+def generateWaypointFromLine(line, panda):
+    # Get target_pose and transform tcp->gym
+    target_pose = list()
+    for e in line:
+        target_pose.append(float(e))
+    target_wrist = panda.getWristFromTCP(target_pose[:7])
+
+    # Generate waypoint and add it
+    waypoint = Pose()
+    waypoint.position.x = target_wrist[0]
+    waypoint.position.y = target_wrist[1]
+    waypoint.position.z = target_wrist[2]
+    waypoint.orientation.x = target_wrist[3]
+    waypoint.orientation.y = target_wrist[4]
+    waypoint.orientation.z = target_wrist[5]
+    waypoint.orientation.w = target_wrist[6]
+    return waypoint
 
 
 def main(FILE_PATH):
@@ -16,30 +35,59 @@ def main(FILE_PATH):
         # Create panda moveit interface
         panda = PandaMoveitInterface(delay=1)
 
-        # Create waypoints
-        waypoints = list()
+        # Read trajectory file
         with open(FILE_PATH, 'r') as file_reader:
-            # Get waipoints
-            for line in file_reader:
-                # Get target_pose and transform tcp->gym
-                target_pose = list()
-                for e in line.split():
-                    target_pose.append(float(e))
-                target_wrist = panda.getWristFromTCP(target_pose[:7])
+            # GRIPPER OPEN
+            line = file_reader.readline()
+            gripper = float(line)
+            panda.moveToHandPose(gripper)
 
-                # Generate waypoint and add it
-                waypoint = Pose()
-                waypoint.position.x = target_wrist[0]
-                waypoint.position.y = target_wrist[1]
-                waypoint.position.z = target_wrist[2]
-                waypoint.orientation.x = target_wrist[3]
-                waypoint.orientation.y = target_wrist[4]
-                waypoint.orientation.z = target_wrist[5]
-                waypoint.orientation.w = target_wrist[6]
+
+            # START
+            line = file_reader.readline()
+            tcp_target_pose = list()
+            for e in line.split():
+                tcp_target_pose.append(float(e))
+            panda.moveToArmPoseTCP(tcp_target_pose)
+
+
+            # PRE-GRASP and GRASP
+            waypoints = list()
+            while True:
+                line = file_reader.readline()
+                components = line.split()
+                
+                if len(components) == 1:
+                    break
+
+                waypoint = generateWaypointFromLine(components, panda)
                 waypoints.append(copy.deepcopy(waypoint))
+            panda.execute_cartesian_path(waypoints=waypoints)
 
-        # Execute cartesian path from this waypoints
-        panda.execute_cartesian_path(waypoints=waypoints)
+
+            # CLOSE GRIPPER
+            gripper = float(line)
+            panda.moveToHandPose(gripper)
+
+
+            # PLACE
+            waypoints = list()
+            while True:
+                line = file_reader.readline()
+                components = line.split()
+                
+                if len(components) == 1:
+                    break
+
+                waypoint = generateWaypointFromLine(components, panda)
+                waypoints.append(copy.deepcopy(waypoint))
+            panda.execute_cartesian_path(waypoints=waypoints)
+
+
+            # OPEN GRIPPER
+            gripper = float(line)
+            panda.moveToHandPose(gripper)
+
 
     except rospy.ROSInterruptException:
         print("ROS interrupted")
