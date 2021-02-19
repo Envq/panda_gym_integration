@@ -9,7 +9,7 @@ from src.colors import print_col, colorize
 # Panda-gym and AI
 import gym
 import panda_gym
-from ai.panda_actors import AiActor
+from ai.panda_actors import AiActor, HandEngActor
 
 # Other
 import numpy as np
@@ -192,6 +192,7 @@ def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENV_ENABLED, 
 
     # initialize Actor
     my_actor = GymEnvironment(DEBUG_ENV_ENABLED, ACTOR=AiActor(DEBUG_ENABLED=DEBUG_AI_ENABLED))
+    # my_actor = GymEnvironment(DEBUG_ENV_ENABLED, ACTOR=HandEngActor(DEBUG_ENABLED=DEBUG_AI_ENABLED))
 
     # statistics
     results = {

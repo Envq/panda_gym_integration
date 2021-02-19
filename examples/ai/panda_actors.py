@@ -176,6 +176,124 @@ class AiActor():
                 self.phase = 0
                 time.sleep(self.phase_change_delay)
 
+        # FINISH
+        if self.phase == 0:
+            return np.array([0., 0., 0.,  0., 0., 0., 1.,  1]) # action
+
+
+    def getPhase(self):
+        return self.phase
+
+
+    def goalIsAchieved(self):
+        return self.phase == 0
+
+
+        
+class HandEngActor():
+    def __init__(self, DEBUG_ENABLED=False, MAX_EPISODE_STEPS=60):
+        # attributes
+        self.debug_enabled = DEBUG_ENABLED
+        self.max_episode_steps = MAX_EPISODE_STEPS
+        self.phase = 0    # 0=finish, 1=pre-grasp, 2=grasp, 3=post-grasp
+        self.timer = 0
+        self.phase_change_delay = 1                      # [sec]
+        
+        # To reduce the number of waypoints for this task, increase this value
+        self.offset = 6.0
+
+        self.approach_position_tollerance      = 0.005   # [m]
+        self.approach_orientation_tollerance   = 0.005   # [m]
+        self.manipulate_position_tollerance    = 0.005   # [m]
+        self.manipulate_orientation_tollerance = 0.005   # [m]
+        self.retract_position_tollerance       = 0.005   # [m]
+        self.retract_orientation_tollerance    = 0.005   # [m]
+    
+                    
+    def _debugPrint(self, msg, color='FG_DEFAULT'):
+        if self.debug_enabled: 
+            print_col(msg, color)
+
+
+    def setMaxEpisodeSteps(self, max_steps):
+        self.max_episode_steps = max_steps
+
+    
+    def reset(self, goal_pose, objOnStart_pose, preGrasp_pose):
+        # reset attributes
+        self.phase = 1
+        self.timer = 0
+
+        # get goal pose
+        self.goal_pose = goal_pose
+
+        # get object pose on start
+        self.objOnStart_pose = objOnStart_pose
+        
+        # generate pre_grasp pose
+        self.preGrasp_pose = preGrasp_pose
+
+        # debug
+        self._debugPrint("[ai   ] Goal pose {}".format(goal_pose.tolist()), 'FG_MAGENTA')
+        self._debugPrint("[ai   ] ObjectOnStart pose {}".format(objOnStart_pose.tolist()), 'FG_MAGENTA')
+        self._debugPrint("[ai   ] PreGrasp pose {}\n".format(preGrasp_pose.tolist()), 'FG_MAGENTA')
+
+
+    def getAction(self, obs, current_pose, current_gripper):
+        action = self._policy(obs, current_pose, current_gripper)
+        self.timer += 1
+
+        # debug
+        self._debugPrint("[ai   ] Obs {}".format(obs), 'FG_MAGENTA')
+        self._debugPrint("[ai   ] Current pose {}".format(current_pose.tolist()), 'FG_MAGENTA')
+        self._debugPrint("[ai   ] Current gripper {}".format(current_gripper), 'FG_MAGENTA')
+        self._debugPrint("[ai   ] action {}\n".format(action.tolist()), 'FG_MAGENTA')
+        return action
+
+
+    def _policy(self, obs, current_pose, current_gripper):
+        action = np.zeros(8)
+
+        # APPROACH
+        if self.phase == 1:
+            if self.timer <= 20 and \
+                (np.linalg.norm(self.preGrasp_pose[:3] - current_pose[:3]) >= self.approach_position_tollerance or \
+                 np.linalg.norm(self.preGrasp_pose[3:] - current_pose[3:]) >= self.approach_orientation_tollerance): 
+                action[:3] = (self.preGrasp_pose[:3] - current_pose[:3]) * self.offset 
+                action[3:7] = quaternion_multiply(self.preGrasp_pose[3:7], current_pose[3:7])
+                action[7] = 1 # open gripper
+                return action
+            else:
+                self.phase = 2
+                self.timer = 0
+                time.sleep(self.phase_change_delay)
+            
+        # MANIPULATE
+        if self.phase == 2: 
+            if self.timer < self.max_episode_steps and \
+                (np.linalg.norm(self.objOnStart_pose[:3] - current_pose[:3]) >= self.manipulate_position_tollerance or \
+                 np.linalg.norm(self.objOnStart_pose[3:] - current_pose[3:]) >= self.manipulate_orientation_tollerance): 
+                action[:3] = (self.objOnStart_pose[:3] - current_pose[:3]) * self.offset 
+                action[3:7] = quaternion_multiply(self.objOnStart_pose[3:7], current_pose[3:7])
+                action[7] = 1 # open gripper
+                return action
+            else:
+                self.phase = 3
+                self.timer = 0
+                time.sleep(self.phase_change_delay)
+   
+        # RETRACT
+        if self.phase == 3:
+            if self.timer < self.max_episode_steps and \
+                (np.linalg.norm(self.goal_pose[:3] - current_pose[:3]) >= self.retract_position_tollerance or \
+                 np.linalg.norm(self.goal_pose[3:] - current_pose[3:]) >= self.retract_orientation_tollerance): 
+                action[:3] = (self.goal_pose[:3] - current_pose[:3]) * self.offset 
+                action[3:7] = quaternion_multiply(self.goal_pose[3:7], current_pose[3:7])
+                action[7] = -1 # close gripper
+                return action
+            else:
+                self.phase = 0
+                time.sleep(self.phase_change_delay)
 
         # FINISH
         if self.phase == 0:

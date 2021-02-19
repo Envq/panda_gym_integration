@@ -242,12 +242,11 @@ class PandaActor():
 
     def _robot_get_target(self, real_to_tcp, real_fingersWidth, action):
         # Perform action with real robot: real_to_tcp -> tcp_to_target
-        offset = self.offset 
         variation = 0.05 # This is the correction of pos_ctrl in line 81 panda_env.py in panda_gym
 
-        x = real_to_tcp[0] + ((action[0] / offset) * variation)
-        y = real_to_tcp[1] + ((action[1] / offset) * variation)
-        z = real_to_tcp[2] + ((action[2] / offset) * variation)
+        x = real_to_tcp[0] + (action[0] * variation)
+        y = real_to_tcp[1] + (action[1] * variation)
+        z = real_to_tcp[2] + (action[2] * variation)
         if action[3] < 0:
             grip = self.obj_width    # gripper close to obj
             grasp = 1
