@@ -322,9 +322,9 @@ if __name__ == "__main__":
     PORT = 2000
     NUM_EPISODES = 1
     LEN_EPISODE = 100
-    DEBUG_ENABLED = False
+    DEBUG_ENABLED = True
     RENDER = True
-    ENABLE_REAL_PANDA = False
+    ENABLE_REAL_PANDA = True
 
 
     if (len(sys.argv) > 1):

@@ -103,7 +103,7 @@ def main(FILE_PATH):
 
 
 if __name__ == "__main__":
-    FILE_NAME = "trajectory"
+    FILE_NAME = "trajectory_test"
 
 
     file_path = os.path.join(os.path.dirname(__file__), "../data/trajectories/" + FILE_NAME + ".txt")
