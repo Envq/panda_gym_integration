@@ -9,6 +9,9 @@ import rospy
 from moveit_commander.exception import MoveItCommanderException
 import moveit_commander
 
+# Gripper controller
+from panda_gripper import PandaGripperInterface
+
 # TF2
 import tf2_ros
 from tf.transformations import quaternion_multiply
@@ -22,12 +25,18 @@ import time
 
 
 class PandaMoveitInterface(object):
-  def __init__(self, delay = 0):
+  def __init__(self, delay = 0, gripper_enabled = False):
     super(PandaMoveitInterface, self).__init__()
     self.arm = moveit_commander.MoveGroupCommander("panda_arm")
     self.hand = moveit_commander.MoveGroupCommander("hand")
     self.tf_buffer = tf2_ros.Buffer()
     self.tf_listener = tf2_ros.TransformListener(self.tf_buffer) 
+
+    # Gripper settings
+    self.gripper_enabled = gripper_enabled
+
+    if self.gripper_enabled:
+      self.gripper = PandaGripperInterface(startup_homing=True)
 
     # Wait for correct loading
     time.sleep(delay) 
@@ -262,6 +271,31 @@ class PandaMoveitInterface(object):
     # Execute planning
     self.arm.execute(plan, wait=True)
   
+
+  # GRIPPER INTERFACE-------------------------------------------------
+  def gripper_homing(self):
+    if self.gripper_enabled:
+      self.gripper.homing()
+    
+
+  def gripper_move(self, width, speed):
+    if self.gripper_enabled:
+      self.gripper.move(self, width, speed)
+    else:
+      self.moveToHandPose(width)
+    
+
+  def gripper_grasp(self, width, epsilon_inner, epsilon_outer, speed, force):
+    if self.gripper_enabled:
+      self.gripper.grasp(self, width, epsilon_inner, epsilon_outer, speed, force)
+    else:
+      self.moveToHandPose(width)
+    
+    
+  def gripper_stop(self):
+    if self.gripper_enabled:
+      self.gripper.stop()
+
 
 
 def test1(sys):
