@@ -4,6 +4,7 @@
 import sys
 sys.path.append("../../scripts/")
 from src.utils import quaternion_multiply, transform
+from src.colors import print_col, colorize
 
 # Other
 from .models import actor
@@ -15,9 +16,10 @@ import time
 
 
 class AiActor():
-    def __init__(self, max_episode_steps=50):
+    def __init__(self, DEBUG_ENABLED=False, MAX_EPISODE_STEPS=50):
         # attributes
-        self.max_episode_steps = max_episode_steps
+        self.debug_enabled = DEBUG_ENABLED
+        self.max_episode_steps = MAX_EPISODE_STEPS
         self.phase = 0    # 0=finish, 1=pre-grasp, 2=grasp, 3=post-grasp
         self.timer = 0
         self.phase_change_delay = 1                      # [sec]
@@ -68,6 +70,11 @@ class AiActor():
         self.actor_network_retract.load_state_dict(model_retract)
         self.actor_network_retract.eval()
     
+                    
+    def _debugPrint(self, msg, color='FG_DEFAULT'):
+        if self.debug_enabled: 
+            print_col(msg, color)
+
 
     def setMaxEpisodeSteps(self, max_steps):
         self.max_episode_steps = max_steps
@@ -95,12 +102,23 @@ class AiActor():
         self.objOnStart_pose = objOnStart_pose
         
         # generate pre_grasp pose
-        self.preGrasp_pose = preGrasp_pose  
+        self.preGrasp_pose = preGrasp_pose
+
+        # debug
+        self._debugPrint("[ai   ] Goal pose {}".format(goal_pose.tolist()), 'FG_MAGENTA')
+        self._debugPrint("[ai   ] ObjectOnStart pose {}".format(objOnStart_pose.tolist()), 'FG_MAGENTA')
+        self._debugPrint("[ai   ] PreGrasp pose {}\n".format(preGrasp_pose.tolist()), 'FG_MAGENTA')
 
 
     def getAction(self, obs, current_pose, current_gripper):
         action = self._policy(obs, current_pose, current_gripper)
         self.timer += 1
+
+        # debug
+        self._debugPrint("[ai   ] Current pose {}".format(current_pose.tolist()), 'FG_MAGENTA')
+        self._debugPrint("[ai   ] Current gripper {}".format(current_gripper), 'FG_MAGENTA')
+        self._debugPrint("[ai   ] action {}\n".format(action.tolist()), 'FG_MAGENTA')
+        self._debugPrint("[ai   ] Obs {}".format(obs), 'FG_MAGENTA')
         return action
 
 

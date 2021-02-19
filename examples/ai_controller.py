@@ -18,8 +18,9 @@ import numpy as np
 class MoveitEnvironment():
     def __init__(self, DEBUG_ENABLED, HOST, PORT, ACTOR):
         # attributes
-        self.panda_to_gym = np.array([-0.6919, -0.7441, -0.3,  0, 0, 0, 1]) # [panda -> gym] trasformation
         self.debug_enabled = DEBUG_ENABLED
+        self.panda_to_gym = np.array([-0.6919, -0.7441, -0.3,  0, 0, 0, 1]) # [panda -> gym] trasformation
+        self.gym_to_panda = -self.panda_to_gym                              # [gym -> panda] trasformation
         self.obj_width = 0.04                    # [m]
         # panda_gym internally applies this adjustment to actions (in _set_action()), 
         # so you need to apply it here as well 
@@ -41,10 +42,12 @@ class MoveitEnvironment():
 
     def reset(self):
         # get object pose on start
-        self.objOnStart_pose = np.array([0.7019080739083265, -0.11301889621397332, 0.125, 0.0, 0.0, 0.0, 1.0])
+        self.objOnStart_pose = np.array([0.7372437366715479, -0.12809706951065392, 0.125,  0.0, 0.0, 0.0, 1.0])
+        self.gym_to_objOnStart = transform(self.gym_to_panda, self.objOnStart_pose)
         
         # get goal pose
-        self.goal_pose = np.array([0.738619682797228, 0.04043141396766836, 0.5272451383552441, 0.0, 0.0, 0.0, 1.0])
+        self.goal_pose = np.array([0.5140610820925247, 0.1455496609401591, 0.125,  0.0, 0.0, 0.0, 1.0])
+        gym_to_goal = transform(self.gym_to_panda, self.goal_pose)
         
         # start msg
         # start_pose = [0.6014990053878944, 1.5880450818915202e-06, 0.29842061906465916, -3.8623752044513406e-06, -0.0013073068882995874, -5.91084615330739e-06, 0.9999991454490569]
@@ -55,15 +58,24 @@ class MoveitEnvironment():
         # send start state msg
         self.panda.sendGoalState(start_pose + [start_gripper, start_grasp])
         
+        
         # generate pre_grasp pose
         self.preGrasp_pose = self.objOnStart_pose.copy()
         self.preGrasp_pose[2] += 0.031  # [m] above the obj
+        gym_to_preGrasp = transform(self.gym_to_panda, self.preGrasp_pose)
 
         # reset attributes
-        self.actor.reset(self.goal_pose, self.objOnStart_pose, self.preGrasp_pose)
+        # self.actor.reset(self.goal_pose, self.objOnStart_pose, self.preGrasp_pose)
+        self.actor.reset(gym_to_goal, self.gym_to_objOnStart, gym_to_preGrasp)
 
         # get observation
         self._getObs()
+
+        # debug
+        self._debugPrint("[gym  ] Goal: {}".format(gym_to_goal.tolist()), 'FG_BLUE')
+        self._debugPrint("[panda] Goal: {}".format(self.goal_pose.tolist()), 'FG_BLUE')
+        self._debugPrint("[gym  ] Obj:  {}".format(self.gym_to_objOnStart.tolist()), 'FG_BLUE')
+        self._debugPrint("[panda] Obj:  {}\n".format(self.objOnStart_pose.tolist()), 'FG_BLUE')
 
     
     def _getObs(self):
@@ -80,28 +92,11 @@ class MoveitEnvironment():
 
         # get current fingers width
         self.current_gripper = current_msg[7]               # gripper_state
-        finger0 = finger1 = self.current_gripper / 2.0
-
-        # generate obs for AI
-        self.obs = np.zeros(25)
-        self.obs[:3]    = self.current_pose[:3]     # grip_pos
-        self.obs[3:6]   = self.objOnStart_pose[:3]  # object_pos
-        self.obs[6:9]   = 0                         # object_rel_pos
-        self.obs[9:11]  = [finger0, finger1]        # gripper_state
-        self.obs[11:14] = 0                         # object_rot
-        self.obs[14:17] = 0                         # object_velp
-        self.obs[17:20] = 0                         # object_velr
-        self.obs[20:23] = 0                         # grip_velp
-        self.obs[23:25] = 0                         # gripper_vel
-
-        # adjust object_pos info for retract-ai (It use object_pos as current_pose info)
-        if self.actor.getPhase() == 3:
-            self.obs[3:6] = self.current_pose[:3]   # object_pos
 
 
     def getTargetInfo(self):
         # get action
-        self.action = self.actor.getAction(self.obs, self.current_pose, self.current_gripper)
+        self.action = self._getAction()
 
         # process action
         action = self.action.copy()
@@ -117,9 +112,37 @@ class MoveitEnvironment():
         # generate target grasp
         self.target_grasp = 1 if self.action[7] < 0 else 0
 
-        self._debugPrint("Action: {}".format(action.tolist()), 'FG_WHITE')
-        self._debugPrint("Current pose: {}".format(self.current_pose.tolist()), 'FG_WHITE')
-        self._debugPrint("Target pose: {}\n".format(self.target_pose.tolist()), 'FG_WHITE')
+        # debug
+        self._debugPrint("[panda] Current pose: {}".format(self.current_pose.tolist()), 'FG_WHITE')
+        self._debugPrint("[final] Action: {}".format(action.tolist()), 'FG_WHITE')
+        self._debugPrint("[panda] Target pose: {}\n".format(self.target_pose.tolist()), 'FG_WHITE')
+    
+
+    def _getAction(self):
+        # adjust current pose and get fingers
+        gym_to_current = transform(self.gym_to_panda, self.current_pose)
+        finger0 = finger1 = self.current_gripper / 2.0
+
+        self._debugPrint("[gym  ] Current pose: {}".format(gym_to_current.tolist()), 'FG_WHITE')
+
+        # generate obs for AI
+        obs = np.zeros(25)
+        obs[:3]    = gym_to_current[:3]          # grip_pos
+        obs[3:6]   = self.gym_to_objOnStart[:3]  # object_pos
+        obs[6:9]   = 0                           # object_rel_pos
+        obs[9:11]  = [finger0, finger1]          # gripper_state
+        obs[11:14] = 0                           # object_rot
+        obs[14:17] = 0                           # object_velp
+        obs[17:20] = 0                           # object_velr
+        obs[20:23] = 0                           # grip_velp
+        obs[23:25] = 0                           # gripper_vel
+
+        # adjust object_pos info for retract-ai (It use object_pos as current_pose info)
+        if self.actor.getPhase() == 3:
+            obs[3:6] = gym_to_current[:3]        # object_pos
+
+        # get action
+        return self.actor.getAction(obs, gym_to_current, self.current_gripper)
 
 
     def step(self):
@@ -148,9 +171,9 @@ class MoveitEnvironment():
 
 
 
-def main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENABLED, HOST, PORT):
+def main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENV_ENABLED, DEBUG_AI_ENABLED, HOST, PORT):
     # initialize Actor
-    my_actor = MoveitEnvironment(DEBUG_ENABLED, HOST, PORT, ACTOR=AiActor())
+    my_actor = MoveitEnvironment(DEBUG_ENV_ENABLED, HOST, PORT, ACTOR=AiActor(DEBUG_ENABLED=DEBUG_AI_ENABLED))
 
     # statistics
     results = {
@@ -215,9 +238,10 @@ if __name__ == "__main__":
     # PARAMETERS
     HOST = "127.0.0.1"
     PORT = 2000
-    DEBUG_ENABLED = True
-    NUM_EPISODES = 2
-    LEN_EPISODE = 150           
+    DEBUG_ENV_ENABLED = True
+    DEBUG_AI_ENABLED = False
+    NUM_EPISODES = 1
+    LEN_EPISODE = 150
 
 
-    main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENABLED, HOST, PORT)
+    main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENV_ENABLED, DEBUG_AI_ENABLED, HOST, PORT)

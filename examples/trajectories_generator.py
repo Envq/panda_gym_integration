@@ -21,8 +21,8 @@ import os
 class GymEnvironment():
     def __init__(self, DEBUG_ENABLED, ACTOR):
         # attributes
-        self.panda_to_gym = np.array([-0.6919, -0.7441, -0.3,  0, 0, 0, 1]) # [panda -> gym] trasformation
         self.debug_enabled = DEBUG_ENABLED
+        self.panda_to_gym = np.array([-0.6919, -0.7441, -0.3,  0, 0, 0, 1]) # [panda -> gym] trasformation
         self.last_phase = 0
         self.obj_width = 0.04                    # [m]
         # panda_gym internally applies this adjustment to actions (in _set_action()), 
@@ -69,6 +69,10 @@ class GymEnvironment():
         # get observation
         self._getObs(observation)
 
+        # debug
+        self._debugPrint("Goal: {}".format(transform(self.panda_to_gym, self.goal_pose).tolist()), 'FG_BLUE')
+        self._debugPrint("Obj:  {}\n".format(transform(self.panda_to_gym, self.objOnStart_pose).tolist()), 'FG_BLUE')
+
         # return start behaviour
         return ([0.6014990053878944, 1.5880450818915202e-06, 0.29842061906465916,  \
                 -3.8623752044513406e-06, -0.0013073068882995874, -5.91084615330739e-06, 0.9999991454490569], \
@@ -86,28 +90,12 @@ class GymEnvironment():
         finger1 = observation["observation"][10]
         self.current_gripper = finger0 + finger1                   # gripper_state
 
-        # generate obs for AI
-        self.obs = np.zeros(25)
-        self.obs[:3]    = self.current_pose[:3]     # grip_pos
-        self.obs[3:6]   = self.objOnStart_pose[:3]  # object_pos
-        self.obs[6:9]   = 0                         # object_rel_pos
-        self.obs[9:11]  = [finger0, finger1]        # gripper_state
-        self.obs[11:14] = 0                         # object_rot
-        self.obs[14:17] = 0                         # object_velp
-        self.obs[17:20] = 0                         # object_velr
-        self.obs[20:23] = 0                         # grip_velp
-        self.obs[23:25] = 0                         # gripper_vel
-
-        # adjust object_pos info for retract-ai (It use object_pos as current_pose info)
-        if self.actor.getPhase() == 3:
-            self.obs[3:6] = self.current_pose[:3]   # object_pos
-
 
     def getTargetInfo(self):
         self.env.render()
 
         # get action
-        self.action = self.actor.getAction(self.obs, self.current_pose, self.current_gripper)
+        self.action = self._getAction()
 
         # generate gripper state
         if self.actor.getPhase() == 2 and self.last_phase == 1:
@@ -124,7 +112,6 @@ class GymEnvironment():
         else:
             gripper_state = 0                 # no operation
 
-
         # process action
         action = self.action.copy()
         action[:3] *= self.panda_gym_action_correction
@@ -133,13 +120,38 @@ class GymEnvironment():
         current_pose = transform(self.panda_to_gym, self.current_pose)
         target_pose = transform(current_pose, action[:7])
 
-        self._debugPrint("Action: {}".format(action.tolist()), 'FG_WHITE')
         self._debugPrint("Current pose: {}".format(current_pose.tolist()), 'FG_WHITE')
+        self._debugPrint("Action: {}".format(action.tolist()), 'FG_WHITE')
         self._debugPrint("Target pose: {}\n".format(target_pose.tolist()), 'FG_WHITE')
 
         self.last_phase = self.actor.getPhase()         # update last_phase
 
         return (target_pose.tolist(), gripper_state)
+    
+
+    def _getAction(self):
+        # get fingers
+        finger0 = finger1 = self.current_gripper / 2.0
+
+        # generate obs for AI
+        obs = np.zeros(25)
+        obs[:3]    = self.current_pose[:3]     # grip_pos
+        obs[3:6]   = self.objOnStart_pose[:3]  # object_pos
+        obs[6:9]   = 0                         # object_rel_pos
+        obs[9:11]  = [finger0, finger1]        # gripper_state
+        obs[11:14] = 0                         # object_rot
+        obs[14:17] = 0                         # object_velp
+        obs[17:20] = 0                         # object_velr
+        obs[20:23] = 0                         # grip_velp
+        obs[23:25] = 0                         # gripper_vel
+
+        # adjust object_pos info for retract-ai (It use object_pos as current_pose info)
+        if self.actor.getPhase() == 3:
+            obs[3:6] = self.current_pose[:3]   # object_pos
+
+        # get action
+        return self.actor.getAction(obs, self.current_pose, self.current_gripper)
+
 
    
     def step(self):
@@ -174,12 +186,12 @@ class GymEnvironment():
 
 
 
-def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENABLED):
+def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENV_ENABLED, DEBUG_AI_ENABLED):
     # for writing
     trajectory = list()
 
     # initialize Actor
-    my_actor = GymEnvironment(DEBUG_ENABLED, ACTOR=AiActor())
+    my_actor = GymEnvironment(DEBUG_ENV_ENABLED, ACTOR=AiActor(DEBUG_ENABLED=DEBUG_AI_ENABLED))
 
     # statistics
     results = {
@@ -267,7 +279,8 @@ def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENABLED):
 
 
 if __name__ == "__main__":
-    DEBUG_ENABLED = False
+    DEBUG_ENV_ENABLED = False
+    DEBUG_AI_ENABLED = False
     NUM_EPISODES = 2
     LEN_EPISODE = 150
     WRITE_ENABLE = True
@@ -276,4 +289,4 @@ if __name__ == "__main__":
            
 
     file_path = os.path.join(os.path.dirname(__file__), "../data/trajectories/" + FILE_NAME + ".txt")
-    main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, file_path, DEBUG_ENABLED)
+    main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, file_path, DEBUG_ENV_ENABLED, DEBUG_AI_ENABLED)
