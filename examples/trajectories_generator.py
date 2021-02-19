@@ -22,7 +22,7 @@ import os
 
 
 class PandaActor():
-    def __init__(self, max_episode_steps):
+    def __init__(self, max_episode_steps=50):
         # attributes
         self.max_episode_steps = max_episode_steps
         self.phase = 0    # 0=finish, 1=pre-grasp, 2=grasp, 3=post-grasp
@@ -74,6 +74,10 @@ class PandaActor():
         self.actor_network_retract = actor(env_params)
         self.actor_network_retract.load_state_dict(model_retract)
         self.actor_network_retract.eval()
+    
+
+    def setMaxEpisodeSteps(self, max_steps):
+        self.max_episode_steps = max_steps
 
 
     def _process_inputs(self, o, g, o_mean, o_std, g_mean, g_std, args):
@@ -176,20 +180,23 @@ class PandaActor():
 
 
 
-class PandaEnvironment():
-    """GLOBAL BEHAVIOUR"""
-    def __init__(self, DEBUG_ENABLED):
+class GymEnvironment():
+    def __init__(self, DEBUG_ENABLED, ACTOR):
         # attributes
         self.panda_to_gym = np.array([-0.6919, -0.7441, -0.3,  0, 0, 0, 1]) # [panda -> gym] trasformation
         self.debug_enabled = DEBUG_ENABLED
         self.last_phase = 0
-        self.obj_width = 0.04                            # [m]
+        self.obj_width = 0.04                    # [m]
+        # panda_gym internally applies this adjustment to actions (in _set_action()), 
+        # so you need to apply it here as well 
+        self.panda_gym_action_correction = 0.05  # (limit maximum change in position)
 
         # create gym environment
         self.env = gym.make("PandaPickAndPlace-v0", render=True)
 
         # create actor
-        self.actor = PandaActor(self.env._max_episode_steps)
+        self.actor = ACTOR
+        self.actor.setMaxEpisodeSteps(self.env._max_episode_steps)
                     
     
     def _debugPrint(self, msg, color='FG_DEFAULT'):
@@ -282,7 +289,7 @@ class PandaEnvironment():
 
         # process action
         action = self.action.copy()
-        action[:3] *= 0.05  # Correct with panda-gym (limit maximum change in position)
+        action[:3] *= self.panda_gym_action_correction
 
         # generate target pose
         current_pose = transform(self.panda_to_gym, self.current_pose)
@@ -298,8 +305,11 @@ class PandaEnvironment():
 
    
     def step(self):
+        # get correct action for gym
         pos = self.action[:3].tolist()
         grip = [self.action[7]]
+
+        # insert action in gym and observe
         observation, reward, done, self.info = self.env.step(pos + grip)
         self._getObs(observation)
 
@@ -326,13 +336,12 @@ class PandaEnvironment():
 
 
 
-
 def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENABLED):
     # for writing
     trajectory = list()
 
     # initialize Actor
-    my_actor = PandaEnvironment(DEBUG_ENABLED)
+    my_actor = GymEnvironment(DEBUG_ENABLED, ACTOR=PandaActor())
 
     # statistics
     results = {
