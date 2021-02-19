@@ -21,6 +21,7 @@ class MoveitEnvironment():
         self.debug_enabled = DEBUG_ENABLED
         self.panda_to_gym = np.array([-0.6919, -0.7441, -0.3,  0, 0, 0, 1]) # [panda -> gym] trasformation
         self.gym_to_panda = -self.panda_to_gym                              # [gym -> panda] trasformation
+        self.gym_to_panda[6] = 1
         self.obj_width = 0.04                    # [m]
         # panda_gym internally applies this adjustment to actions (in _set_action()), 
         # so you need to apply it here as well 
@@ -42,11 +43,13 @@ class MoveitEnvironment():
 
     def reset(self):
         # get object pose on start
-        self.objOnStart_pose = np.array([0.7372437366715479, -0.12809706951065392, 0.125,  0.0, 0.0, 0.0, 1.0])
+        self.objOnStart_pose = np.array([0.34, 0.0, 0.6,  0.0, 0.0, 0.0, 1.0])
+        # self.objOnStart_pose = np.array([0.5048428215095773, -0.07165085976476693, 0.125, 0.0, 0.0, 0.0, 1.0])
         self.gym_to_objOnStart = transform(self.gym_to_panda, self.objOnStart_pose)
         
         # get goal pose
-        self.goal_pose = np.array([0.5140610820925247, 0.1455496609401591, 0.125,  0.0, 0.0, 0.0, 1.0])
+        self.goal_pose = np.array([0.38, 0.0, 0.6,  0.0, 0.0, 0.0, 1.0])
+        # self.goal_pose = np.array([0.7029948442091138, -0.04770550454761002, 0.2727019519554263, 0.0, 0.0, 0.0, 1.0])
         gym_to_goal = transform(self.gym_to_panda, self.goal_pose)
         
         # start msg
@@ -57,8 +60,7 @@ class MoveitEnvironment():
 
         # send start state msg
         self.panda.sendGoalState(start_pose + [start_gripper, start_grasp])
-        
-        
+                
         # generate pre_grasp pose
         self.preGrasp_pose = self.objOnStart_pose.copy()
         self.preGrasp_pose[2] += 0.031  # [m] above the obj
@@ -72,10 +74,10 @@ class MoveitEnvironment():
         self._getObs()
 
         # debug
-        self._debugPrint("[gym  ] Goal: {}".format(gym_to_goal.tolist()), 'FG_BLUE')
-        self._debugPrint("[panda] Goal: {}".format(self.goal_pose.tolist()), 'FG_BLUE')
         self._debugPrint("[gym  ] Obj:  {}".format(self.gym_to_objOnStart.tolist()), 'FG_BLUE')
-        self._debugPrint("[panda] Obj:  {}\n".format(self.objOnStart_pose.tolist()), 'FG_BLUE')
+        self._debugPrint("[panda] Obj:  {}".format(self.objOnStart_pose.tolist()), 'FG_BLUE')
+        self._debugPrint("[gym  ] Goal: {}".format(gym_to_goal.tolist()), 'FG_BLUE')
+        self._debugPrint("[panda] Goal: {}\n".format(self.goal_pose.tolist()), 'FG_BLUE')
 
     
     def _getObs(self):
@@ -158,7 +160,7 @@ class MoveitEnvironment():
             # get statistics            
             stats = dict()
             stats['position_error'] = np.linalg.norm(self.goal_pose[:3] - self.current_pose[:3])
-            stats['orientation_error'] = np.linalg.norm(self.goal_pose_pose[3:] - self.current_pose[3:])
+            stats['orientation_error'] = np.linalg.norm(self.goal_pose[3:] - self.current_pose[3:])
             stats['gym_success'] = self.info['is_success']
             return (True, stats)
         else:
@@ -239,7 +241,7 @@ if __name__ == "__main__":
     HOST = "127.0.0.1"
     PORT = 2000
     DEBUG_ENV_ENABLED = True
-    DEBUG_AI_ENABLED = False
+    DEBUG_AI_ENABLED = True
     NUM_EPISODES = 1
     LEN_EPISODE = 150
 

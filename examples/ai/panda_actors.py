@@ -115,10 +115,10 @@ class AiActor():
         self.timer += 1
 
         # debug
+        self._debugPrint("[ai   ] Obs {}".format(obs), 'FG_MAGENTA')
         self._debugPrint("[ai   ] Current pose {}".format(current_pose.tolist()), 'FG_MAGENTA')
         self._debugPrint("[ai   ] Current gripper {}".format(current_gripper), 'FG_MAGENTA')
         self._debugPrint("[ai   ] action {}\n".format(action.tolist()), 'FG_MAGENTA')
-        self._debugPrint("[ai   ] Obs {}".format(obs), 'FG_MAGENTA')
         return action
 
 
