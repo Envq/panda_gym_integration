@@ -70,8 +70,8 @@ class GymEnvironment():
         self._getObs(observation)
 
         # debug
-        self._debugPrint("Goal: {}".format(transform(self.panda_to_gym, self.goal_pose).tolist()), 'FG_BLUE')
-        self._debugPrint("Obj:  {}\n".format(transform(self.panda_to_gym, self.objOnStart_pose).tolist()), 'FG_BLUE')
+        self._debugPrint("[panda] Obj pose: {}".format(transform(self.panda_to_gym, self.objOnStart_pose).tolist()), 'FG_BLUE')
+        self._debugPrint("[panda] Goal pose: {}\n".format(transform(self.panda_to_gym, self.goal_pose).tolist()), 'FG_BLUE')
 
         # return start behaviour
         return ([0.6014990053878944, 1.5880450818915202e-06, 0.29842061906465916,  \
@@ -97,6 +97,10 @@ class GymEnvironment():
         # get action
         self.action = self._getAction()
 
+        # process action
+        action = self.action.copy()
+        action[:3] *= self.panda_gym_action_correction
+
         # generate gripper state
         if self.actor.getPhase() == 2 and self.last_phase == 1:
             self._debugPrint("PRE-GRASP: successful", 'FG_YELLOW_BRIGHT')
@@ -112,17 +116,13 @@ class GymEnvironment():
         else:
             gripper_state = 0                 # no operation
 
-        # process action
-        action = self.action.copy()
-        action[:3] *= self.panda_gym_action_correction
-
         # generate target pose
         current_pose = transform(self.panda_to_gym, self.current_pose)
         target_pose = transform(current_pose, action[:7])
 
-        self._debugPrint("Current pose: {}".format(current_pose.tolist()), 'FG_WHITE')
-        self._debugPrint("Action: {}".format(action.tolist()), 'FG_WHITE')
-        self._debugPrint("Target pose: {}\n".format(target_pose.tolist()), 'FG_WHITE')
+        self._debugPrint("[panda] Current pose: {}".format(current_pose.tolist()), 'FG_WHITE')
+        self._debugPrint("[final] Action: {}".format(action.tolist()), 'FG_WHITE')
+        self._debugPrint("[panda] Target pose: {}\n".format(target_pose.tolist()), 'FG_WHITE')
 
         self.last_phase = self.actor.getPhase()         # update last_phase
 
@@ -280,11 +280,11 @@ def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENV_ENABLED, 
 
 
 if __name__ == "__main__":
-    DEBUG_ENV_ENABLED = False
+    DEBUG_ENV_ENABLED = True
     DEBUG_AI_ENABLED = False
-    NUM_EPISODES = 2
+    NUM_EPISODES = 1
     LEN_EPISODE = 150
-    WRITE_ENABLE = True
+    WRITE_ENABLE = False
     # FILE_NAME = "trajectory_" + datetime.today().strftime('%Y-%m-%d-%H:%M:%S')
     FILE_NAME = "trajectory_test"
            

@@ -43,18 +43,19 @@ class MoveitEnvironment():
 
     def reset(self):
         # get object pose on start
-        self.objOnStart_pose = np.array([0.34, 0.0, 0.6,  0.0, 0.0, 0.0, 1.0])
+        self.objOnStart_pose = np.array([0.34, 0.0, 0.2,  0.0, 0.0, 0.0, 1.0])
         # self.objOnStart_pose = np.array([0.5048428215095773, -0.07165085976476693, 0.125, 0.0, 0.0, 0.0, 1.0])
+        # self.objOnStart_pose = np.array([0.6789352992277409, -0.08219292981645365, 0.125, 0.0, 0.0, 0.0, 1.0])
         self.gym_to_objOnStart = transform(self.gym_to_panda, self.objOnStart_pose)
         
         # get goal pose
-        self.goal_pose = np.array([0.38, 0.0, 0.6,  0.0, 0.0, 0.0, 1.0])
+        self.goal_pose = np.array([0.38, 0.0, 0.2,  0.0, 0.0, 0.0, 1.0])
         # self.goal_pose = np.array([0.7029948442091138, -0.04770550454761002, 0.2727019519554263, 0.0, 0.0, 0.0, 1.0])
+        # self.goal_pose = np.array([0.6148329752153725, 0.14252585763032344, 0.2207092613994081, 0.0, 0.0, 0.0, 1.0])
         gym_to_goal = transform(self.gym_to_panda, self.goal_pose)
         
         # start msg
-        # start_pose = [0.6014990053878944, 1.5880450818915202e-06, 0.29842061906465916, -3.8623752044513406e-06, -0.0013073068882995874, -5.91084615330739e-06, 0.9999991454490569]
-        start_pose = [0.3, 0.0, 0.6,  0.0, 0.0, 0.0, 1.0]
+        start_pose = [0.2514990053878944, 1.5880450818915202e-06, 0.29842061906465916, -3.8623752044513406e-06, -0.0013073068882995874, -5.91084615330739e-06, 0.9999991454490569]
         start_gripper = 0.08
         start_grasp = 0
 
@@ -74,10 +75,10 @@ class MoveitEnvironment():
         self._getObs()
 
         # debug
-        self._debugPrint("[gym  ] Obj:  {}".format(self.gym_to_objOnStart.tolist()), 'FG_BLUE')
-        self._debugPrint("[panda] Obj:  {}".format(self.objOnStart_pose.tolist()), 'FG_BLUE')
-        self._debugPrint("[gym  ] Goal: {}".format(gym_to_goal.tolist()), 'FG_BLUE')
-        self._debugPrint("[panda] Goal: {}\n".format(self.goal_pose.tolist()), 'FG_BLUE')
+        # self._debugPrint("[gym  ] Obj pose:  {}".format(self.gym_to_objOnStart.tolist()), 'FG_BLUE')
+        self._debugPrint("[panda] Obj pose:  {}".format(self.objOnStart_pose.tolist()), 'FG_BLUE')
+        # self._debugPrint("[gym  ] Goal pose: {}".format(gym_to_goal.tolist()), 'FG_BLUE')
+        self._debugPrint("[panda] Goal pose: {}\n".format(self.goal_pose.tolist()), 'FG_BLUE')
 
     
     def _getObs(self):
@@ -125,7 +126,7 @@ class MoveitEnvironment():
         gym_to_current = transform(self.gym_to_panda, self.current_pose)
         finger0 = finger1 = self.current_gripper / 2.0
 
-        self._debugPrint("[gym  ] Current pose: {}".format(gym_to_current.tolist()), 'FG_WHITE')
+        # self._debugPrint("[gym  ] Current pose: {}".format(gym_to_current.tolist()), 'FG_WHITE')
 
         # generate obs for AI
         obs = np.zeros(25)
@@ -161,7 +162,6 @@ class MoveitEnvironment():
             stats = dict()
             stats['position_error'] = np.linalg.norm(self.goal_pose[:3] - self.current_pose[:3])
             stats['orientation_error'] = np.linalg.norm(self.goal_pose[3:] - self.current_pose[3:])
-            stats['gym_success'] = self.info['is_success']
             return (True, stats)
         else:
             return (False, None)
@@ -180,7 +180,6 @@ def main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENV_ENABLED, DEBUG_AI_ENABLED, HOST, P
     # statistics
     results = {
         'goalsAchived': 0,
-        'gym_successes': 0,
         'position_errors': list(),
         'orientation_errors': list(),
         'steps': list()
@@ -205,7 +204,6 @@ def main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENV_ENABLED, DEBUG_AI_ENABLED, HOST, P
             # check the output condition
             if goal_achived:
                 results['goalsAchived'] += 1
-                results['gym_successes'] += stats['gym_success']
                 results['position_errors'].append(stats['position_error'])
                 results['orientation_errors'].append(stats['orientation_error'])
                 results['steps'].append(timer + 1)
@@ -241,7 +239,7 @@ if __name__ == "__main__":
     HOST = "127.0.0.1"
     PORT = 2000
     DEBUG_ENV_ENABLED = True
-    DEBUG_AI_ENABLED = True
+    DEBUG_AI_ENABLED = False
     NUM_EPISODES = 1
     LEN_EPISODE = 150
 
