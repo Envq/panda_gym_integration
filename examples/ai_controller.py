@@ -20,7 +20,7 @@ class MoveitEnvironment():
         # attributes
         self.debug_enabled = DEBUG_ENABLED
         self.panda_to_gym = np.array([-0.6919, -0.7441, -0.3,  0, 0, 0, 1]) # [panda -> gym] trasformation
-        self.gym_to_panda = -self.panda_to_gym                              # [gym -> panda] trasformation
+        self.gym_to_panda = np.array([ 0.6919,  0.7441,  0.3,  0, 0, 0, 1]) # [gym -> panda] trasformation
         self.gym_to_panda[6] = 1
         self.obj_width = 0.04                    # [m]
         # panda_gym internally applies this adjustment to actions (in _set_action()), 
@@ -55,7 +55,7 @@ class MoveitEnvironment():
         gym_to_goal = transform(self.gym_to_panda, self.goal_pose)
         
         # start msg
-        start_pose = [0.2514990053878944, 1.5880450818915202e-06, 0.29842061906465916, -3.8623752044513406e-06, -0.0013073068882995874, -5.91084615330739e-06, 0.9999991454490569]
+        start_pose = [0.6014990053878944, 1.5880450818915202e-06, 0.29842061906465916, -3.8623752044513406e-06, -0.0013073068882995874, -5.91084615330739e-06, 0.9999991454490569]
         start_gripper = 0.08
         start_grasp = 0
 
