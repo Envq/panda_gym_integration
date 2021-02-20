@@ -14,7 +14,7 @@ class PandaActor():
     def __init__(self, DEBUG_ENABLED, HOST, PORT):
         # demo parameters
         self.debug_enabled = DEBUG_ENABLED
-        self.tolerance = 0.005     # [m]
+        self.tolerance = 0.015     # [m]
 
         # initialize
         self.panda = PandaInterface(HOST, PORT)
@@ -48,7 +48,7 @@ class PandaActor():
         self.current_pose = np.array(current_msg[:7])
         self.current_gripper = current_msg[7] # fingers width
 
-        self._debugPrint("[real] Start: {}\n".format(self.current_pose.tolist() + [self.current_gripper]), 'FG_BLUE')
+        self._debugPrint("[real] Start: {}\n".format(self.current_pose.tolist() + [self.current_gripper]), 'FG_WHITE')
         
 
     def getAction(self, time_step):
@@ -59,7 +59,7 @@ class PandaActor():
             self.target_pose[0] -= 0.01
         self.target_gripper = self.current_gripper
 
-        self._debugPrint("[real] Target: {}".format(self.target_pose.tolist() + [self.target_gripper]), 'FG_BLUE')
+        self._debugPrint("[real] Target: {}".format(self.target_pose.tolist() + [self.target_gripper]), 'FG_WHITE')
     
     
     def step(self):
@@ -77,7 +77,7 @@ class PandaActor():
         self.current_pose = np.array(current_msg[:7])
         self.current_gripper = current_msg[7] # fingers width
 
-        self._debugPrint("[real] Current: {}".format(self.current_pose.tolist() + [self.current_gripper]), 'FG_BLUE')
+        self._debugPrint("[real] Current: {}".format(self.current_pose.tolist() + [self.current_gripper]), 'FG_WHITE')
         self._debugPrint("")
 
 
@@ -128,7 +128,7 @@ if __name__ == "__main__":
     PORT = 2000
     NUM_EPISODES = 1
     LEN_EPISODE = 100
-    DEBUG_ENABLED = False
+    DEBUG_ENABLED = True
 
 
     if len(sys.argv) > 1:
