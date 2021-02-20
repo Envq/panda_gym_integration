@@ -133,7 +133,7 @@ class AiActor():
                     pi = self.actor_network_approach(input_tensor)
                     action = pi.detach().cpu().numpy().squeeze()
                     position = action[:3]
-                orientation = quaternion_multiply(current_pose[3:], self.preGrasp_pose[3:])
+                orientation = [0, 0, 0, 1]
                 grip = [1] # open gripper
                 return np.append(np.append(position, orientation), grip) # action
             else:
@@ -151,7 +151,7 @@ class AiActor():
                     pi = self.actor_network_manipulate(input_tensor)
                     action = pi.detach().cpu().numpy().squeeze()
                     position = action[:3]
-                orientation = quaternion_multiply(current_pose[3:], self.objOnStart_pose[3:])
+                orientation = [0, 0, 0, 1]
                 grip = [1] # open gripper
                 return np.append(np.append(position, orientation), grip) # action
             else:
@@ -169,7 +169,7 @@ class AiActor():
                     pi = self.actor_network_retract(input_tensor)
                     action = pi.detach().cpu().numpy().squeeze()
                     position = action[:3]
-                orientation = quaternion_multiply(current_pose[3:], self.goal_pose[3:])
+                orientation = [0, 0, 0, 1]
                 grip = [-1] # close gripper
                 return np.append(np.append(position, orientation), grip) # action
             else:
@@ -187,6 +187,97 @@ class AiActor():
 
     def goalIsAchieved(self):
         return self.phase == 0
+
+
+
+class E2EActor():
+    def __init__(self, DEBUG_ENABLED=False):
+        # attributes
+        self.debug_enabled = DEBUG_ENABLED
+        
+        self.position_tollerance      = 0.040   # [m]
+        self.orientation_tollerance   = 0.010   # [m]
+
+        # load ai
+        self._loadAI()
+    
+
+    def _loadAI(self):
+        # get arguments
+        self.args = get_args()
+
+        # load model [e2e]
+        model_path = "ai/" + self.args.save_dir + self.args.env_name + '/e2e.pt'
+        self.o_mean, self.o_std, self.g_mean, self.g_std, model = torch.load(model_path, map_location=lambda storage, loc: storage)
+        
+        # get the environment params
+        env_params = {
+                        'obs': 25,         # observation['observation'].shape[0]
+                        'goal': 3,         # observation['desired_goal'].shape[0]
+                        'action': 4,       # self.env.action_space.shape[0]
+                        'action_max':1.0,  # self.env.action_space.high[0]
+                     }
+
+        # create the actor network
+        self.actor_network = actor(env_params)
+        self.actor_network.load_state_dict(model)
+        self.actor_network.eval()
+        
+                    
+    def _debugPrint(self, msg, color='FG_DEFAULT'):
+        if self.debug_enabled: 
+            print_col(msg, color)
+
+
+    def _process_inputs(self, o, g, o_mean, o_std, g_mean, g_std, args):
+        o_clip = np.clip(o, -args.clip_obs, args.clip_obs)
+        g_clip = np.clip(g, -args.clip_obs, args.clip_obs)
+        o_norm = np.clip((o_clip - o_mean) / (o_std), -args.clip_range, args.clip_range)
+        g_norm = np.clip((g_clip - g_mean) / (g_std), -args.clip_range, args.clip_range)
+        inputs = np.concatenate([o_norm, g_norm])
+        inputs = torch.tensor(inputs, dtype=torch.float32)
+        return inputs
+                
+    
+    def reset(self, goal_pose, objOnStart_pose, preGrasp_pose):
+        # get goal pose
+        self.goal_pose = goal_pose.copy()
+
+        # debug
+        self._debugPrint("[ai   ] Goal pose {}".format(goal_pose.tolist()), 'FG_MAGENTA')
+
+
+    def getAction(self, obs, current_pose, current_gripper):
+        action = self._policy(obs)
+
+        self.current_pose = current_pose.copy()
+
+        # debug
+        # self._debugPrint("[ai   ] Obs {}".format(self.obs), 'FG_MAGENTA')
+        self._debugPrint("[ai   ] Current pose {}".format(current_pose.tolist()), 'FG_MAGENTA')
+        self._debugPrint("[ai   ] Current gripper {}".format(current_gripper), 'FG_MAGENTA')
+        self._debugPrint("[ai   ] action {}\n".format(action.tolist()), 'FG_MAGENTA')
+        return action
+
+
+    def _policy(self, obs):
+        with torch.no_grad():
+            input_tensor = self._process_inputs(obs, self.goal_pose[:3], self.o_mean, self.o_std, self.g_mean, self.g_std, self.args)
+            pi = self.actor_network(input_tensor)
+            action = pi.detach().cpu().numpy().squeeze()
+            position = action[:3]
+        orientation = [0, 0, 0, 1]
+        grip = [action[3]]
+        return np.append(np.append(position, orientation), grip) # action
+
+
+    def getPhase(self):
+        return -1  # disabled
+
+
+    def goalIsAchieved(self):
+        return (np.linalg.norm(self.goal_pose[:3] - self.current_pose[:3]) < self.position_tollerance and \
+                np.linalg.norm(self.goal_pose[3:] - self.current_pose[3:]) < self.orientation_tollerance)
 
 
         
@@ -259,8 +350,8 @@ class HandEngActor():
             if self.timer <= 20 and \
                 (np.linalg.norm(self.preGrasp_pose[:3] - current_pose[:3]) >= self.approach_position_tollerance or \
                  np.linalg.norm(self.preGrasp_pose[3:] - current_pose[3:]) >= self.approach_orientation_tollerance): 
-                action[:3] = (self.preGrasp_pose[:3] - current_pose[:3]) * self.offset 
-                action[3:7] = quaternion_multiply(self.preGrasp_pose[3:7], current_pose[3:7])
+                action[:3] = (self.preGrasp_pose[:3] - current_pose[:3]) * self.offset
+                action[3:7] = [0, 0, 0, 1]
                 action[7] = 1 # open gripper
                 return action
             else:
@@ -273,8 +364,8 @@ class HandEngActor():
             if self.timer < self.max_episode_steps and \
                 (np.linalg.norm(self.objOnStart_pose[:3] - current_pose[:3]) >= self.manipulate_position_tollerance or \
                  np.linalg.norm(self.objOnStart_pose[3:] - current_pose[3:]) >= self.manipulate_orientation_tollerance): 
-                action[:3] = (self.objOnStart_pose[:3] - current_pose[:3]) * self.offset 
-                action[3:7] = quaternion_multiply(self.objOnStart_pose[3:7], current_pose[3:7])
+                action[:3] = (self.objOnStart_pose[:3] - current_pose[:3]) * self.offset
+                action[3:7] = [0, 0, 0, 1]
                 action[7] = 1 # open gripper
                 return action
             else:
@@ -287,8 +378,8 @@ class HandEngActor():
             if self.timer < self.max_episode_steps and \
                 (np.linalg.norm(self.goal_pose[:3] - current_pose[:3]) >= self.retract_position_tollerance or \
                  np.linalg.norm(self.goal_pose[3:] - current_pose[3:]) >= self.retract_orientation_tollerance): 
-                action[:3] = (self.goal_pose[:3] - current_pose[:3]) * self.offset 
-                action[3:7] = quaternion_multiply(self.goal_pose[3:7], current_pose[3:7])
+                action[:3] = (self.goal_pose[:3] - current_pose[:3]) * self.offset
+                action[3:7] = [0, 0, 0, 1]
                 action[7] = -1 # close gripper
                 return action
             else:

@@ -9,7 +9,7 @@ from src.colors import print_col, colorize
 # Panda-gym and AI
 import gym
 import panda_gym
-from ai.panda_actors import AiActor, HandEngActor
+from ai.panda_actors import AiActor, HandEngActor, E2EActor
 
 # Other
 import numpy as np
@@ -34,7 +34,8 @@ class GymEnvironment():
 
         # create actor
         self.actor = ACTOR
-        self.actor.setMaxEpisodeSteps(self.env._max_episode_steps)
+        if type(ACTOR) == AiActor or type(ACTOR) == HandEngActor:
+            self.actor.setMaxEpisodeSteps(self.env._max_episode_steps)
                     
     
     def _debugPrint(self, msg, color='FG_DEFAULT'):
@@ -89,6 +90,9 @@ class GymEnvironment():
         finger0 = observation["observation"][9]
         finger1 = observation["observation"][10]
         self.current_gripper = finger0 + finger1                   # gripper_state
+
+        # get gym obs
+        self.gym_obs = observation["observation"]
 
 
     def getTargetInfo(self):
@@ -149,6 +153,10 @@ class GymEnvironment():
         if self.actor.getPhase() == 3:
             obs[3:6] = self.current_pose[:3]   # object_pos
 
+        # adjust obs for E2EActor
+        if type(self.actor) == E2EActor:
+            obs = self.gym_obs
+
         # get action
         return self.actor.getAction(obs, self.current_pose, self.current_gripper)
 
@@ -186,13 +194,12 @@ class GymEnvironment():
 
 
 
-def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENV_ENABLED, DEBUG_AI_ENABLED):
+def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENV_ENABLED, ACTOR):
     # for writing
     trajectory = list()
 
     # initialize Actor
-    my_actor = GymEnvironment(DEBUG_ENV_ENABLED, ACTOR=AiActor(DEBUG_ENABLED=DEBUG_AI_ENABLED))
-    # my_actor = GymEnvironment(DEBUG_ENV_ENABLED, ACTOR=HandEngActor(DEBUG_ENABLED=DEBUG_AI_ENABLED))
+    my_actor = GymEnvironment(DEBUG_ENV_ENABLED, ACTOR)
 
     # statistics
     results = {
@@ -282,12 +289,16 @@ def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENV_ENABLED, 
 if __name__ == "__main__":
     DEBUG_ENV_ENABLED = True
     DEBUG_AI_ENABLED = False
-    NUM_EPISODES = 1
+    NUM_EPISODES = 10
     LEN_EPISODE = 150
     WRITE_ENABLE = False
     # FILE_NAME = "trajectory_" + datetime.today().strftime('%Y-%m-%d-%H:%M:%S')
     FILE_NAME = "trajectory_test"
+
+    # ACTOR = ACTOR=AiActor(DEBUG_ENABLED=DEBUG_AI_ENABLED)
+    ACTOR = ACTOR=E2EActor(DEBUG_ENABLED=DEBUG_AI_ENABLED)
+    # ACTOR = ACTOR=HandEngActor(DEBUG_ENABLED=DEBUG_AI_ENABLED)
            
 
     file_path = os.path.join(os.path.dirname(__file__), "../data/trajectories/" + FILE_NAME + ".txt")
-    main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, file_path, DEBUG_ENV_ENABLED, DEBUG_AI_ENABLED)
+    main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, file_path, DEBUG_ENV_ENABLED, ACTOR)
