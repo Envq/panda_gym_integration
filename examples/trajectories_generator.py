@@ -36,6 +36,9 @@ class GymEnvironment():
         self.actor = ACTOR
         if type(ACTOR) == AiActor or type(ACTOR) == HandEngActor:
             self.actor.setMaxEpisodeSteps(self.env._max_episode_steps)
+        
+        if type(ACTOR) == E2EActor:
+            self.last_gripper_state = 0.08  # open gripper
                     
     
     def _debugPrint(self, msg, color='FG_DEFAULT'):
@@ -119,6 +122,26 @@ class GymEnvironment():
 
         else:
             gripper_state = 0                 # no operation
+        
+        # adjust gripper_state for E2EActor
+        if type(self.actor) == E2EActor:
+            print("gripper: {}".format(self.action[7]))
+
+            # generate gripper_state
+            if self.action[7] < 0:
+                gripper_state = self.obj_width
+            else:
+                gripper_state = 0.08
+            
+            # check if the goal will be reached at the next step
+            if np.linalg.norm(self.goal_pose[:3] - (self.current_pose[:3] + self.action[:3])) < 0.31:
+                gripper_state = 0.08
+            
+            # normalize gripper_state (-> 0 if current is equal to last)
+            if gripper_state == self.last_gripper_state:
+                gripper_state = 0
+            else:
+                self.last_gripper_state = gripper_state     
 
         # generate target pose
         current_pose = transform(self.panda_to_gym, self.current_pose)
@@ -203,7 +226,7 @@ def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENV_ENABLED, 
 
     # statistics
     results = {
-        'goalsAchived': 0,
+        'goals_achived': 0,
         'gym_successes': 0,
         'position_errors': list(),
         'orientation_errors': list(),
@@ -223,7 +246,7 @@ def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENV_ENABLED, 
         trajectory.append(target_pose)
         
         # start episode
-        for timer in range(LEN_EPISODE):
+        for time_step in range(LEN_EPISODE):
             # generate a new action from observations and create a target pose with it
             (target_pose, gripper_state)  = my_actor.getTargetInfo()
 
@@ -240,17 +263,17 @@ def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENV_ENABLED, 
 
             # check the output condition
             if goal_achived:
-                results['goalsAchived'] += 1
+                results['goals_achived'] += 1
                 results['gym_successes'] += stats['gym_success']
                 results['position_errors'].append(stats['position_error'])
                 results['orientation_errors'].append(stats['orientation_error'])
-                results['steps'].append(timer + 1)
+                results['steps'].append(time_step + 1)
                 break
 
         if goal_achived:
-            print_col("[Episode {}] Goal achived in {} steps".format(episode, timer + 1), 'FG_GREEN_BRIGHT')
+            print_col("[Episode {}] Goal achived in {} steps".format(episode, time_step + 1), 'FG_GREEN_BRIGHT')
         else:
-            print_col("[Episode {}] Goal not achived in {} steps".format(episode, timer + 1), 'FG_RED_BRIGHT')
+            print_col("[Episode {}] Goal not achived in {} steps".format(episode, time_step + 1), 'FG_RED_BRIGHT')
         
         # write to file
         if WRITE_ENABLE and input("Write to file? [y/n] ") == 'y':
@@ -271,13 +294,14 @@ def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENV_ENABLED, 
     print("-----------------------------------")
     print_col("All Episodes finish", 'FG_GREEN')
 
-    successes = results['goalsAchived']
+    successes = results['goals_achived']
     # successes = results['gym_successes']
     fails = NUM_EPISODES - successes
     print_col("accuracy: {}%".format(successes / float(NUM_EPISODES) * 100.0), 'FG_YELLOW_BRIGHT')
     print_col("  - episodes:  {}".format(colorize(str(NUM_EPISODES), 'FG_WHITE')),        'FG_WHITE')
     print_col("  - successes: {}".format(colorize(str(successes),    'FG_GREEN_BRIGHT')), 'FG_WHITE')
     print_col("  - fails:     {}".format(colorize(str(fails),        'FG_RED_BRIGHT')),   'FG_WHITE')
+    print_col("  - gym successes: {}".format(results['gym_successes']), 'FG_WHITE')
     
     if successes > 0:
         print_col("Mean position errors:    {}"  .format(np.mean(results['position_errors'])), 'FG_YELLOW_BRIGHT')
@@ -287,16 +311,16 @@ def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENV_ENABLED, 
 
 
 if __name__ == "__main__":
-    DEBUG_ENV_ENABLED = True
+    DEBUG_ENV_ENABLED = False
     DEBUG_AI_ENABLED = False
-    NUM_EPISODES = 10
+    NUM_EPISODES = 2
     LEN_EPISODE = 150
-    WRITE_ENABLE = False
+    WRITE_ENABLE = True
     # FILE_NAME = "trajectory_" + datetime.today().strftime('%Y-%m-%d-%H:%M:%S')
     FILE_NAME = "trajectory_test"
 
-    # ACTOR = ACTOR=AiActor(DEBUG_ENABLED=DEBUG_AI_ENABLED)
-    ACTOR = ACTOR=E2EActor(DEBUG_ENABLED=DEBUG_AI_ENABLED)
+    ACTOR = ACTOR=AiActor(DEBUG_ENABLED=DEBUG_AI_ENABLED)
+    # ACTOR = ACTOR=E2EActor(DEBUG_ENABLED=DEBUG_AI_ENABLED)
     # ACTOR = ACTOR=HandEngActor(DEBUG_ENABLED=DEBUG_AI_ENABLED)
            
 

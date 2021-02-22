@@ -195,7 +195,7 @@ class E2EActor():
         # attributes
         self.debug_enabled = DEBUG_ENABLED
         
-        self.position_tollerance      = 0.040   # [m]
+        self.position_tollerance      = 0.025   # [m]
         self.orientation_tollerance   = 0.010   # [m]
 
         # load ai
