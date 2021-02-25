@@ -7,9 +7,28 @@ from franka_gripper.msg import HomingAction, MoveAction, GraspAction, StopAction
 from franka_gripper.msg import HomingGoal, MoveGoal, GraspGoal, StopGoal, GraspEpsilon
 
 
+def normalize(val, min, max):
+    if val < min:
+        print("Adust min")
+        return min
+    elif val > max:
+        print("Adjust max")
+        return max
+    else:
+        return val 
+
 
 class PandaGripperInterface():
+    OPEN_VALUE = 0.08
+
     def __init__(self, startup_homing = False): 
+        # Attributes
+        self.MIN_WIDTH = 0.00                               # [m] closed
+        self.MAX_WIDTH = PandaGripperInterface.OPEN_VALUE   # [m] opened
+        self.MIN_FORCE = 0.01                               # [N]
+        self.MAX_FORCE = 50.0                               # [N]
+        self._timeout = 10.0                                # [sec]
+
         # Create action clients
         self._client_homing = actionlib.SimpleActionClient('franka_gripper/homing', HomingAction)
         self._client_move = actionlib.SimpleActionClient('franka_gripper/move', MoveAction)
@@ -22,33 +41,16 @@ class PandaGripperInterface():
         self._client_grasp.wait_for_server()
         self._client_stop.wait_for_server()
 
-        # Other
-        self.MIN_WIDTH = 0.00 # [m] closed
-        self.MAX_WIDTH = 0.08 # [m] opened
-        self.MIN_FORCE = 0.01 # [N]
-        self.MAX_FORCE = 50.0 # [N]
-        self._timeout = 10.0
-
         if startup_homing:
             self.homing()
 
-    def _normalize(self, val, min, max):
-        if val < min:
-            print("Adust min")
-            return min
-        elif val > max:
-            print("Adjust max")
-            return max
-        else:
-            return val 
-
 
     def safe_force(self, val):
-        return self._normalize(val, self.MIN_FORCE, self.MAX_FORCE)
+        return self.normalize(val, self.MIN_FORCE, self.MAX_FORCE)
 
 
     def safe_width(self, val):
-        return self._normalize(val, self.MIN_WIDTH, self.MAX_WIDTH)
+        return self.normalize(val, self.MIN_WIDTH, self.MAX_WIDTH)
 
 
     def setTimeout(self):

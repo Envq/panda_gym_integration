@@ -4,26 +4,18 @@
             type="console.py" 
             respawn="false" 
             output="screen">
-            <!-- custom 1 -->
-            <param name="px1" type="double" value="0.3"/>
-            <param name="py1" type="double" value="0.0"/>
-            <param name="pz1" type="double" value="0.0"/>
+            
 
-            <param name="ox1" type="double" value="0.0"/>
-            <param name="oy1" type="double" value="0.0"/>
-            <param name="oz1" type="double" value="0.0"/>
-            <param name="ow1" type="double" value="1.0"/>
+            <param name="real_robot" type="bool" value="false"/>
 
-            <!-- custom 2 -->
-            <param name="px2" type="double" value="0.3"/>
-            <param name="py2" type="double" value="0.0"/>
-            <param name="pz2" type="double" value="0.0"/>
+            <!-- custom -->
+            <param name="px" type="double" value="0.3"/>
+            <param name="py" type="double" value="0.0"/>
+            <param name="pz" type="double" value="0.0"/>
 
-            <param name="ox2" type="double" value="0.0"/>
-            <param name="oy2" type="double" value="0.0"/>
-            <param name="oz2" type="double" value="0.0"/>
-            <param name="ow2" type="double" value="1.0"/>
-            <param name="fd2" type="double" value="0.0"/>
-            <param name="gr2" type="double" value="1.0"/>
+            <param name="ox" type="double" value="0.0"/>
+            <param name="oy" type="double" value="0.0"/>
+            <param name="oz" type="double" value="0.0"/>
+            <param name="ow" type="double" value="1.0"/>
       </node>
 </launch>

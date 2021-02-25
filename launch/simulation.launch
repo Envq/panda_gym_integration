@@ -1,19 +1,18 @@
 <launch>
     <include file="$(find panda_moveit_config)/launch/demo.launch"/>
 
-
-    <!-- Note: args is x y z yaw pitch roll -->
+    <!-- Note: args is x y z  ox oy oz ow -->
     <node pkg="tf2_ros" 
             type="static_transform_publisher" 
             name="tcp_broadcaster" 
-            args="0.0 0.0 0.1035  -0.7853981633974483 0.0 3.141592653589793 panda_link8 tcp" 
+            args="0.0 0.0 0.1035  0.923879533 -0.382683432e 0.0 0.0 panda_link8 tcp"
     />
 
-
-    <!-- transformation: 0 180 -45 -->
+    <!-- Note: args is x y z yaw pitch roll -->
     <!-- <node pkg="tf2_ros" 
             type="static_transform_publisher" 
             name="tcp_broadcaster" 
-            args="0 0 0.1035  3.82683432e-01 9.23879533e-01 -2.34326020e-17 5.65713056e-17 panda_link8 tcp" 
+            args="0.0 0.0 0.1035  -0.7853981633974483 0.0 3.141592653589793 panda_link8 tcp" 
     /> -->
+
 </launch>
