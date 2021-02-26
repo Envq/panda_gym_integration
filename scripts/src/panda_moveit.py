@@ -8,21 +8,15 @@ from six.moves import input
 import rospy
 from moveit_commander.exception import MoveItCommanderException
 import moveit_commander
-
-# Gripper controller
-from panda_gripper import PandaGripperInterface, normalize
-
-# TF2
-import tf2_ros
-from tf.transformations import quaternion_multiply
-from geometry_msgs.msg import TransformStamped
 from geometry_msgs.msg import PoseStamped
+
+# Custom
+from panda_gripper import PandaGripperInterface, normalize
+from utils import quaternion_equals, transform, transform_inverse
 
 # Other
 from math import pi
 import time
-
-from utils import transform
 
 
 
@@ -32,9 +26,9 @@ class PandaMoveitInterface(object):
         # arm settings
         self.arm = moveit_commander.MoveGroupCommander("panda_arm")
 
-        # transform
-        self.tf_buffer = tf2_ros.Buffer()
-        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer) 
+        # transformations
+        self.wrist_to_tcp = [0.0, 0.0, 0.1035, 0.923879533, -0.382683432, 0.0, 0.0]
+        self.tcp_to_wrist = transform_inverse(self.wrist_to_tcp).tolist()
 
         # gripper settings
         self.real_robot = real_robot
@@ -110,50 +104,17 @@ class PandaMoveitInterface(object):
         except MoveItCommanderException:
             return False
 
-
-    # TCP POSE----------------------------------------------------------  
-    def getWristFromTCP(self, goal_pose):
+ 
+    # TCP POSE----------------------------------------------------------
+    def getWristFromTCP(self, world_to_tcp):
         """Get the world-to-wrist (panda_link8) pose"""
-        # Get world -> tcp transform
-        world_to_tcp = TransformStamped()
-        world_to_tcp.header.frame_id = "panda_link0"
-        world_to_tcp.child_frame_id = "tcp"
-        world_to_tcp.transform.translation.x = goal_pose[0]
-        world_to_tcp.transform.translation.y = goal_pose[1]
-        world_to_tcp.transform.translation.z = goal_pose[2]
-        world_to_tcp.transform.rotation.x = goal_pose[3]
-        world_to_tcp.transform.rotation.y = goal_pose[4]
-        world_to_tcp.transform.rotation.z = goal_pose[5]
-        world_to_tcp.transform.rotation.w = goal_pose[6]
+        return transform(world_to_tcp, self.tcp_to_wrist).tolist()
 
-        # Get tcp -> wrist transform
-        tcp_to_wrist = self.tf_buffer.lookup_transform("tcp", "panda_link8", rospy.Time())
-
-        # Get world -> wrist with transforms composition
-        world_to_wrist = TransformStamped()
-        world_to_wrist.transform.translation.x = world_to_tcp.transform.translation.x + tcp_to_wrist.transform.translation.x
-        world_to_wrist.transform.translation.y = world_to_tcp.transform.translation.y + tcp_to_wrist.transform.translation.y
-        world_to_wrist.transform.translation.z = world_to_tcp.transform.translation.z + tcp_to_wrist.transform.translation.z
-        q1 = [world_to_tcp.transform.rotation.x, world_to_tcp.transform.rotation.y, world_to_tcp.transform.rotation.z, world_to_tcp.transform.rotation.w]
-        q2 = [tcp_to_wrist.transform.rotation.x, tcp_to_wrist.transform.rotation.y, tcp_to_wrist.transform.rotation.z, tcp_to_wrist.transform.rotation.w]
-        q3 = quaternion_multiply(q1, q2)
-        world_to_wrist.transform.rotation.x = q3[0]
-        world_to_wrist.transform.rotation.y = q3[1]
-        world_to_wrist.transform.rotation.z = q3[2]
-        world_to_wrist.transform.rotation.w = q3[3]
-
-        # Return results
-        trans = world_to_wrist.transform.translation
-        rot = world_to_wrist.transform.rotation
-        return [trans.x, trans.y, trans.z, rot.x, rot.y, rot.z, rot.w]
-    
 
     def getArmPoseTCP(self):
         """[px, py, pz, ox, oy, oz, ow] get the world-to-tcp (tool center point) pose"""
-        t = self.tf_buffer.lookup_transform("panda_link0", "tcp", rospy.Time())
-        trans = t.transform.translation
-        rot = t.transform.rotation
-        return [trans.x, trans.y, trans.z, rot.x, rot.y, rot.z, rot.w]
+        world_to_wrist = self.getArmPoseWrist()
+        return transform(world_to_wrist, self.wrist_to_tcp).tolist()
 
   
     def moveArmPoseTCP(self, goal_pose):
@@ -243,84 +204,118 @@ class PandaMoveitInterface(object):
 
 
 def test_type(type):
-    try:
-        panda = PandaMoveitInterface(delay=1)
+    panda = PandaMoveitInterface(delay=1)
+
+    if (type == 'joints'):
+        current = panda.getArmJoints()
+    elif (type == 'wrist'):
+        current = panda.getArmPoseWrist()
+    elif (type == 'tcp'):
+        current = panda.getArmPoseTCP()
+    else:
+        print("error type")
+        return
+    print("current:", current)
+
+    for t in range(20):
+        if t < 10:
+            current[0] += 0.025
+        else:
+            current[0] -= 0.025
 
         if (type == 'joints'):
-            current = panda.getArmJoints()
+            success = panda.moveArmJoints(current)
         elif (type == 'wrist'):
-            current = panda.getArmPoseWrist()
+            success = panda.moveArmPoseWrist(current)
         elif (type == 'tcp'):
-            current = panda.getArmPoseTCP()
-        else:
-            print("error type")
-            return
-        print("current:", current)
+            success = panda.moveArmPoseTCP(current)
 
-        for t in range(20):
-            if t < 10:
-                current[0] += 0.025
-            else:
-                current[0] -= 0.025
-
-            if (type == 'joints'):
-                success = panda.moveArmJoints(current)
-            elif (type == 'wrist'):
-                success = panda.moveArmPoseWrist(current)
-            elif (type == 'tcp'):
-                success = panda.moveArmPoseTCP(current)
-
-            print("[{:>2} step]: {}".format(t, success))
-
-    except rospy.ROSInterruptException:
-        print("ROS interrupted")
-        return
+        print("[{:>2} step]: {}".format(t, success))
 
 
+def test_tf():
+    import tf2_ros
+
+    # Inizialize movegroupinterface
+    panda = PandaMoveitInterface()
+
+    tf_buffer = tf2_ros.Buffer()
+    tf_listener = tf2_ros.TransformListener(tf_buffer)
+    time.sleep(2)
+
+    print("WITH TF: ")
+    wrist_to_tcp_tf = tf_buffer.lookup_transform("panda_link8", "tcp", rospy.Time())
+    wrist_to_tcp = list()
+    wrist_to_tcp.append(wrist_to_tcp_tf.transform.translation.x)
+    wrist_to_tcp.append(wrist_to_tcp_tf.transform.translation.y)
+    wrist_to_tcp.append(wrist_to_tcp_tf.transform.translation.z)
+    wrist_to_tcp.append(wrist_to_tcp_tf.transform.rotation.x)
+    wrist_to_tcp.append(wrist_to_tcp_tf.transform.rotation.y)
+    wrist_to_tcp.append(wrist_to_tcp_tf.transform.rotation.z)
+    wrist_to_tcp.append(wrist_to_tcp_tf.transform.rotation.w)
+    print("wrist_to_tcp:     {}".format(wrist_to_tcp))
+
+    tcp_to_wrist_tf = tf_buffer.lookup_transform("tcp", "panda_link8", rospy.Time())
+    tcp_to_wrist = list()
+    tcp_to_wrist.append(tcp_to_wrist_tf.transform.translation.x)
+    tcp_to_wrist.append(tcp_to_wrist_tf.transform.translation.y)
+    tcp_to_wrist.append(tcp_to_wrist_tf.transform.translation.z)
+    tcp_to_wrist.append(tcp_to_wrist_tf.transform.rotation.x)
+    tcp_to_wrist.append(tcp_to_wrist_tf.transform.rotation.y)
+    tcp_to_wrist.append(tcp_to_wrist_tf.transform.rotation.z)
+    tcp_to_wrist.append(tcp_to_wrist_tf.transform.rotation.w)
+    print("tcp_to_wrist:     {}\n".format(tcp_to_wrist))
+
+    print("WITH UTILS")
+    wrist_to_tcp_my = [0.0, 0.0, 0.1035, 0.923879533, -0.382683432, 0.0, 0.0]
+    print("wrist_to_tcp:     {}".format(wrist_to_tcp_my))
+    
+    tcp_to_wrist_my  = transform_inverse(wrist_to_tcp_my)
+    print("tcp_to_wrist:     {}".format(tcp_to_wrist_my.tolist()))
+    
+    wrist_to_tcp_my2  = transform_inverse(tcp_to_wrist_my)
+    print("wrist_to_tcp_my2: {}\n".format(wrist_to_tcp_my2.tolist()))
+
+    print("Check TF-MY: ({}, {})".format( \
+        quaternion_equals(wrist_to_tcp[3:], wrist_to_tcp_my[3:]), \
+        quaternion_equals(tcp_to_wrist[3:], tcp_to_wrist_my[3:])))
+    
+    print("Check My inv: {}\n".format( \
+        quaternion_equals(wrist_to_tcp_my[3:], wrist_to_tcp_my2[3:])))
+
+    
+    print("Self.wrist_to_tcp: {}".format(panda.wrist_to_tcp))
+    print("Self.tcp_to_wrist: {}".format(panda.tcp_to_wrist))
 
 
-def test3(sys):
-    try:
-        # Initialize moveit_commander and rospy
-        moveit_commander.roscpp_initialize(sys.argv)
-        rospy.init_node('panda_moveit_interface_demo_node', anonymous=True)
 
-        # Inizialize movegroupinterface
-        panda = PandaMoveitInterface(delay=1)
+    print("----------------------------")
 
+    world_to_tcp = [0.3, 0, 0.5,  0, 0, 0, 1]
+    print("world_to_tcp:      {}".format(world_to_tcp))
 
-        tf_buffer = tf2_ros.Buffer()
-        tf_listener = tf2_ros.TransformListener(tf_buffer) 
+    world_to_wirst_my = transform(world_to_tcp, tcp_to_wrist_my)
+    print("world_to_wirst_my: {}".format(world_to_wirst_my.tolist()))
 
-        tcp_to_wrist = tf_buffer.lookup_transform("tcp", "panda_link8", rospy.Time())
-        print("tcp_to_wrist: {}\n".format(tcp_to_wrist))
+    world_to_wirst_tf = panda.getWristFromTCP(world_to_tcp)
+    print("world_to_wirst_tf: {}".format(world_to_wirst_tf))
 
-        wrist_to_tcp = tf_buffer.lookup_transform("panda_link8", "tcp", rospy.Time())
-        print("wrist_to_tcp: {}\n".format(wrist_to_tcp))
+    print("Check TF-MY:  {}\n".format( \
+        quaternion_equals(world_to_wirst_my[3:], world_to_wirst_tf[3:])))
 
-
-
-        print("----------------------------")
-        tcp_to_wrist = [3.85185988877e-34, -1.26750943712e-17, 0.1035,  -0.923879532511, 0.382683432365, 2.34326020266e-17, 5.65713056144e-17]
-        print("tcp_to_wrist: {}\n".format(tcp_to_wrist))
-
-        wrist_to_tcp = [0.0, 0.0, 0.1035,  0.923879532511,  -0.382683432365, -2.34326020266e-17, 5.65713056144e-17]
-        print("wrist_to_tcp: {}\n".format(wrist_to_tcp))
+    world_to_tcp_my = transform(world_to_wirst_my, wrist_to_tcp_my)
+    print("world_to_tcp_my:   {}".format(world_to_tcp_my.tolist()))
+    
+    print("Check My inv: {}\n".format( \
+        quaternion_equals(world_to_tcp[3:], world_to_tcp_my[3:])))
 
 
-        print("----------------------------")
-        world_to_tcp = [0.3, 0, 0.5,  0, 0, 0, 1]
-        print("world_to_tcp: ", world_to_tcp)
+def test_simple():
+    # Inizialize movegroupinterface
+    panda = PandaMoveitInterface(delay=1)
 
-        world_to_wirst = transform(world_to_tcp, tcp_to_wrist)
-        print("world_to_wirst: ", world_to_wirst)
-
-        world_to_tcp = transform(world_to_wirst, wrist_to_tcp)
-        print("world_to_tcp: ", world_to_tcp)
-
-    except rospy.ROSInterruptException:
-        print("ROS interrupted")
-        return
+    pose = [0.3, 0.0, 0.3,  0, 0, 0, 1]
+    panda.moveArmPoseTCP(pose)
 
 
 
@@ -331,10 +326,13 @@ if __name__ == '__main__':
     moveit_commander.roscpp_initialize(sys.argv)
     rospy.init_node('panda_moveit_interface_demo_node', anonymous=True)
 
-    # test_type('joints')
-    # test_type('wrist')
-    test_type('tcp')
-    
+    try:
+        # test_type('joints')
+        # test_type('wrist')
+        # test_type('tcp')
+        # test_tf()
+        test_simple()
 
-
-  
+    except rospy.ROSInterruptException:
+        print("ROS interrupted")
+      
