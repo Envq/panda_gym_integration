@@ -177,14 +177,21 @@ class PandaMoveitInterface(object):
         return self.getArmPoseTCP() + [self.getGripper()]
 
 
-    def movePose(self, goal_pose):
+    def movePose(self, goal_pose, grasp_option=None):
         """ [px, py, pz, ox, oy, oz, ow, fd, gr]
             fd is the distance between the two fingers
             gr is 1 if the grasp is active, otherwise 0"""
-        print("goal: ", goal_pose)
         if self.moveArmPoseTCP(goal_pose[:7]):
             if goal_pose[8] == 1:
-                self.graspGripper(width=goal_pose[7])
+                if grasp_option == None:
+                    self.graspGripper(width=goal_pose[7])
+                else:
+                    self.graspGripper(\
+                        width=goal_pose[7], \
+                        speed=grasp_option['speed'], \
+                        force=grasp_option['force'], \
+                        epsilon_inner=grasp_option['epsilon_inner'], \
+                        epsilon_outer=grasp_option['epsilon_outer'])     
             else:
                 self.moveGripper(width=goal_pose[7])
             return True

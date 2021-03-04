@@ -33,8 +33,8 @@ def main(HOST, PORT):
                 break
 
             # Run goal joints
-            success = panda.moveToPose(goal_pose)
-            print("Success? ", success)
+            success = panda.movePose(goal_pose)
+            print("Success? {}".format(success))
             if not success:
                 print("Error! abort")
                 gym.sendError()

@@ -2,14 +2,17 @@
       <arg name="use_real_robot" default="false"/>
 
       <arg name="gripper_speed" default="0.1"/>
-      <arg name="grasp_force" default="10"/>
+      <arg name="grasp_force" default="20.0"/>
       <arg name="grasp_epsilon_inner" default="0.02"/>
       <arg name="grasp_epsilon_outer" default="0.02"/>
 
+      <arg name="eef_step" default="0.01"/>
+      <arg name="jump_threashould" default="0.0"/>
+
 
       <node pkg="panda_gym_integration" 
-            type="panda_trajectory.py" 
-            name="panda_trajectory_node" 
+            type="panda_path.py" 
+            name="panda_path_node" 
             respawn="false" 
             output="screen">
 
@@ -19,6 +22,10 @@
             <param name="grasp_force" value="$(arg grasp_force)"/>
             <param name="grasp_epsilon_inner" value="$(arg grasp_epsilon_inner)"/>
             <param name="grasp_epsilon_outer" value="$(arg grasp_epsilon_outer)"/>
+
+            <param name="eef_step" value="$(arg eef_step)"/>
+            <param name="jump_threashould" value="$(arg jump_threashould)"/>
+
       </node>
 </launch>
 

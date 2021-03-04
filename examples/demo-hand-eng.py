@@ -22,7 +22,7 @@ class PandaActor():
         self.tolerance = 0.005        # [m]
         self.phase_change_delay = 1   # [sec]
         self.obj_width = 0.04         # [m]
-        self.gripper_move_steps = 10  # [step]
+        self.gripper_move_steps = 1  # [step]
         self.phase = 0  # 1=pre-grasp, 2=grasp, 3=close, 4=place
         self.offset = 6 # decrease this value to increase the points of the trajectory
 

@@ -20,9 +20,10 @@ class AiActor():
         # attributes
         self.debug_enabled = DEBUG_ENABLED
         self.max_episode_steps = MAX_EPISODE_STEPS
-        self.phase = 0    # 0=finish, 1=pre-grasp, 2=grasp, 3=post-grasp
         self.timer = 0
         self.phase_change_delay = 1                      # [sec]
+        # 0=finish, 1=pre-grasp, 2=grasp, 3=close-gripper, 4=place, 5=open-gripper
+        self.phase = 0
         
         self.approach_position_tollerance      = 0.031   # [m]
         self.approach_orientation_tollerance   = 0.005   # [m]
@@ -74,10 +75,6 @@ class AiActor():
     def _debugPrint(self, msg, color='FG_DEFAULT'):
         if self.debug_enabled: 
             print_col(msg, color)
-
-
-    def setMaxEpisodeSteps(self, max_steps):
-        self.max_episode_steps = max_steps
 
 
     def _process_inputs(self, o, g, o_mean, o_std, g_mean, g_std, args):
@@ -133,12 +130,13 @@ class AiActor():
                     pi = self.actor_network_approach(input_tensor)
                     action = pi.detach().cpu().numpy().squeeze()
                     position = action[:3]
-                orientation = [0, 0, 0, 1]
+                orientation = [0., 0., 0., 1.]
                 grip = [1] # open gripper
                 return np.append(np.append(position, orientation), grip) # action
             else:
                 self.phase = 2
                 self.timer = 0
+                print_col("PRE-GRASP: successful", 'FG_YELLOW_BRIGHT')
                 time.sleep(self.phase_change_delay)
             
         # GRASP
@@ -151,16 +149,27 @@ class AiActor():
                     pi = self.actor_network_manipulate(input_tensor)
                     action = pi.detach().cpu().numpy().squeeze()
                     position = action[:3]
-                orientation = [0, 0, 0, 1]
+                orientation = [0., 0., 0., 1.]
                 grip = [1] # open gripper
                 return np.append(np.append(position, orientation), grip) # action
             else:
                 self.phase = 3
                 self.timer = 0
+                print_col("GRASP: successful", 'FG_YELLOW_BRIGHT')
+                time.sleep(self.phase_change_delay)
+            
+        # ClOSE-GRIPPER
+        if self.phase == 3: 
+            if self.timer < 1:
+                return np.array([0., 0., 0.,  0., 0., 0., 1.,  -1]) # action
+            else:
+                self.phase = 4
+                self.timer = 0
+                print_col("CLOSE-GRIPPER: successful", 'FG_YELLOW_BRIGHT')
                 time.sleep(self.phase_change_delay)
    
-        # POST-GRASP
-        if self.phase == 3:
+        # PLACE
+        if self.phase == 4:
             if self.timer < self.max_episode_steps and \
                 (np.linalg.norm(self.goal_pose[:3] - current_pose[:3]) >= self.retract_position_tollerance or \
                  np.linalg.norm(self.goal_pose[3:] - current_pose[3:]) >= self.retract_orientation_tollerance): 
@@ -169,16 +178,28 @@ class AiActor():
                     pi = self.actor_network_retract(input_tensor)
                     action = pi.detach().cpu().numpy().squeeze()
                     position = action[:3]
-                orientation = [0, 0, 0, 1]
+                orientation = [0., 0., 0., 1.]
                 grip = [-1] # close gripper
                 return np.append(np.append(position, orientation), grip) # action
             else:
+                self.phase = 5
+                self.timer = 0
+                print_col("PLACE: successful", 'FG_YELLOW_BRIGHT')
+                time.sleep(self.phase_change_delay)
+            
+        # OPEN-GRIPPER
+        if self.phase == 5: 
+            if self.timer < 1:
+                return np.array([0., 0., 0.,  0., 0., 0., 1.,  1]) # action
+            else:
                 self.phase = 0
+                self.timer = 0
+                print_col("OPEN-GRIPPER: successful", 'FG_YELLOW_BRIGHT')
                 time.sleep(self.phase_change_delay)
 
         # FINISH
         if self.phase == 0:
-            return np.array([0., 0., 0.,  0., 0., 0., 1.,  1]) # action
+            return np.array([0., 0., 0.,  0., 0., 0., 1.,  0]) # action
 
 
     def getPhase(self):
@@ -191,7 +212,7 @@ class AiActor():
 
 
 class E2EActor():
-    def __init__(self, DEBUG_ENABLED=False):
+    def __init__(self, DEBUG_ENABLED=False, MAX_EPISODE_STEPS=150):
         # attributes
         self.debug_enabled = DEBUG_ENABLED
         
@@ -266,7 +287,7 @@ class E2EActor():
             pi = self.actor_network(input_tensor)
             action = pi.detach().cpu().numpy().squeeze()
             position = action[:3]
-        orientation = [0, 0, 0, 1]
+        orientation = [0., 0., 0., 1.]
         grip = [action[3]]
         return np.append(np.append(position, orientation), grip) # action
 
@@ -286,9 +307,10 @@ class HandEngActor():
         # attributes
         self.debug_enabled = DEBUG_ENABLED
         self.max_episode_steps = MAX_EPISODE_STEPS
-        self.phase = 0    # 0=finish, 1=pre-grasp, 2=grasp, 3=post-grasp
         self.timer = 0
         self.phase_change_delay = 1                      # [sec]
+        # 0=finish, 1=approach, 2=manipulate, 3=close-gripper, 4=retract, 5=open-gripper
+        self.phase = 0
         
         # To reduce the number of waypoints for this task, increase this value
         self.offset = 6.0
@@ -304,10 +326,6 @@ class HandEngActor():
     def _debugPrint(self, msg, color='FG_DEFAULT'):
         if self.debug_enabled: 
             print_col(msg, color)
-
-
-    def setMaxEpisodeSteps(self, max_steps):
-        self.max_episode_steps = max_steps
 
     
     def reset(self, goal_pose, objOnStart_pose, preGrasp_pose):
@@ -347,16 +365,17 @@ class HandEngActor():
 
         # APPROACH
         if self.phase == 1:
-            if self.timer <= 20 and \
+            if self.timer < self.max_episode_steps and \
                 (np.linalg.norm(self.preGrasp_pose[:3] - current_pose[:3]) >= self.approach_position_tollerance or \
                  np.linalg.norm(self.preGrasp_pose[3:] - current_pose[3:]) >= self.approach_orientation_tollerance): 
                 action[:3] = (self.preGrasp_pose[:3] - current_pose[:3]) * self.offset
-                action[3:7] = [0, 0, 0, 1]
+                action[3:7] = [0., 0., 0., 1.]
                 action[7] = 1 # open gripper
                 return action
             else:
                 self.phase = 2
                 self.timer = 0
+                print_col("PRE-GRASP: successful", 'FG_YELLOW_BRIGHT')
                 time.sleep(self.phase_change_delay)
             
         # MANIPULATE
@@ -365,25 +384,48 @@ class HandEngActor():
                 (np.linalg.norm(self.objOnStart_pose[:3] - current_pose[:3]) >= self.manipulate_position_tollerance or \
                  np.linalg.norm(self.objOnStart_pose[3:] - current_pose[3:]) >= self.manipulate_orientation_tollerance): 
                 action[:3] = (self.objOnStart_pose[:3] - current_pose[:3]) * self.offset
-                action[3:7] = [0, 0, 0, 1]
+                action[3:7] = [0., 0., 0., 1.]
                 action[7] = 1 # open gripper
                 return action
             else:
                 self.phase = 3
                 self.timer = 0
+                print_col("GRASP: successful", 'FG_YELLOW_BRIGHT')
+                time.sleep(self.phase_change_delay)
+
+        # ClOSE-GRIPPER
+        if self.phase == 3: 
+            if self.timer < 1:
+                return np.array([0., 0., 0.,  0., 0., 0., 1.,  -1]) # action
+            else:
+                self.phase = 4
+                self.timer = 0
+                print_col("CLOSE-GRIPPER: successful", 'FG_YELLOW_BRIGHT')
                 time.sleep(self.phase_change_delay)
    
         # RETRACT
-        if self.phase == 3:
+        if self.phase == 4:
             if self.timer < self.max_episode_steps and \
                 (np.linalg.norm(self.goal_pose[:3] - current_pose[:3]) >= self.retract_position_tollerance or \
                  np.linalg.norm(self.goal_pose[3:] - current_pose[3:]) >= self.retract_orientation_tollerance): 
                 action[:3] = (self.goal_pose[:3] - current_pose[:3]) * self.offset
-                action[3:7] = [0, 0, 0, 1]
+                action[3:7] = [0., 0., 0., 1.]
                 action[7] = -1 # close gripper
                 return action
             else:
+                self.phase = 5
+                self.timer = 0
+                print_col("PLACE: successful", 'FG_YELLOW_BRIGHT')
+                time.sleep(self.phase_change_delay)
+
+        # OPEN-GRIPPER
+        if self.phase == 5: 
+            if self.timer < 1:
+                return np.array([0., 0., 0.,  0., 0., 0., 1.,  1]) # action
+            else:
                 self.phase = 0
+                self.timer = 0
+                print_col("OPEN-GRIPPER: successful", 'FG_YELLOW_BRIGHT')
                 time.sleep(self.phase_change_delay)
 
         # FINISH

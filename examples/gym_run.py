@@ -3,7 +3,7 @@
 # Custom
 import sys
 sys.path.append("../scripts/")
-from src.utils import quaternion_multiply, transform
+from src.utils import transform
 from src.colors import print_col, colorize
 
 # Panda-gym and AI
@@ -19,23 +19,22 @@ import os
 
 
 class GymEnvironment():
-    def __init__(self, DEBUG_ENABLED, ACTOR):
+    def __init__(self, DEBUG_ENABLED, OBJECT_WIDTH, ACTOR):
         # attributes
         self.debug_enabled = DEBUG_ENABLED
-        self.panda_to_gym = np.array([-0.6919, -0.7441, -0.3,  0, 0, 0, 1]) # [panda -> gym] trasformation
-        self.last_phase = 0
-        self.obj_width = 0.04                    # [m]
+        self.obj_width = OBJECT_WIDTH
         # panda_gym internally applies this adjustment to actions (in _set_action()), 
         # so you need to apply it here as well 
         self.panda_gym_action_correction = 0.05  # (limit maximum change in position)
+
+        # trasformations
+        self.panda_to_gym = np.array([-0.6919, -0.7441, -0.3,  0, 0, 0, 1]) # [panda -> gym]
 
         # create gym environment
         self.env = gym.make("PandaPickAndPlace-v0", render=True)
 
         # create actor
         self.actor = ACTOR
-        if type(ACTOR) == AiActor or type(ACTOR) == HandEngActor:
-            self.actor.setMaxEpisodeSteps(self.env._max_episode_steps)
         
         if type(ACTOR) == E2EActor:
             self.last_gripper_state = 0.08  # open gripper
@@ -47,47 +46,44 @@ class GymEnvironment():
 
 
     def reset(self):
-        # reset attributes
-        self.last_phase = 1
-
         # reset environment
         observation = self.env.reset()
 
         # get goal pose
         goal_posit = observation["desired_goal"]
         goal_orien = [0, 0, 0, 1]
-        self.goal_pose = np.concatenate((goal_posit, goal_orien), axis=None)
+        self.gym_to_goal = np.concatenate((goal_posit, goal_orien), axis=None)
 
         # get object pose on start
         objOnStart_posit = observation["observation"][3:6]         # object_pos
         objOnStart_orien = [0, 0, 0, 1]
-        self.objOnStart_pose = np.concatenate((objOnStart_posit, objOnStart_orien), axis=None)
+        self.gym_to_objOnStart = np.concatenate((objOnStart_posit, objOnStart_orien), axis=None)
         
         # generate pre_grasp pose
-        self.preGrasp_pose = self.objOnStart_pose.copy()
-        self.preGrasp_pose[2] += 0.031  # [m] above the obj
+        self.gym_to_preGrasp = self.gym_to_objOnStart.copy()
+        self.gym_to_preGrasp[2] += 0.031  # [m] above the obj
 
         # reset attributes
-        self.actor.reset(self.goal_pose, self.objOnStart_pose, self.preGrasp_pose)
+        self.actor.reset(self.gym_to_goal, self.gym_to_objOnStart, self.gym_to_preGrasp)
 
         # get observation
         self._getObs(observation)
 
         # debug
-        self._debugPrint("[panda] Obj pose: {}".format(transform(self.panda_to_gym, self.objOnStart_pose).tolist()), 'FG_BLUE')
-        self._debugPrint("[panda] Goal pose: {}\n".format(transform(self.panda_to_gym, self.goal_pose).tolist()), 'FG_BLUE')
+        self._debugPrint("[panda] Obj pose: {}".format(transform(self.panda_to_gym, self.gym_to_objOnStart).tolist()), 'FG_BLUE')
+        self._debugPrint("[panda] Goal pose: {}\n".format(transform(self.panda_to_gym, self.gym_to_goal).tolist()), 'FG_BLUE')
 
         # return start behaviour
-        return ([0.6014990053878944, 1.5880450818915202e-06, 0.29842061906465916,  \
-                -3.8623752044513406e-06, -0.0013073068882995874, -5.91084615330739e-06, 0.9999991454490569], \
-                0.08) # open gripper
+        return [0.6014990053878944, 1.5880450818915202e-06, 0.29842061906465916,  \
+                -3.8623752044513406e-06, -0.0013073068882995874, -5.91084615330739e-06, 0.9999991454490569, \
+                0.08] # open gripper
 
     
     def _getObs(self, observation):
         # get current tcp pose
         current_posit = observation["observation"][:3]             # grip_pos
         current_orien = [0, 0, 0, 1]
-        self.current_pose = np.concatenate((current_posit, current_orien), axis=None)
+        self.gym_to_current = np.concatenate((current_posit, current_orien), axis=None)
 
         # get current gripper
         finger0 = observation["observation"][9]
@@ -98,7 +94,7 @@ class GymEnvironment():
         self.gym_obs = observation["observation"]
 
 
-    def getTargetInfo(self):
+    def getTarget(self):
         self.env.render()
 
         # get action
@@ -106,54 +102,19 @@ class GymEnvironment():
 
         # process action
         action = self.action.copy()
-        action[:3] *= self.panda_gym_action_correction
-
-        # generate gripper state
-        if self.actor.getPhase() == 2 and self.last_phase == 1:
-            self._debugPrint("PRE-GRASP: successful", 'FG_YELLOW_BRIGHT')
-
-        if self.actor.getPhase() == 3 and self.last_phase == 2:
-            self._debugPrint("GRASP: successful", 'FG_YELLOW_BRIGHT')
-            gripper_state = self.obj_width    # close gripper after grasp phase
-
-        elif self.actor.getPhase() == 0 and self.last_phase == 3:
-            self._debugPrint("POST-GRASP: successful", 'FG_YELLOW_BRIGHT')
-            gripper_state = 0.08              # open gripper after post-grasp phase
-
-        else:
-            gripper_state = 0                 # no operation
-        
-        # adjust gripper_state for E2EActor
-        if type(self.actor) == E2EActor:
-            print("gripper: {}".format(self.action[7]))
-
-            # generate gripper_state
-            if self.action[7] < 0:
-                gripper_state = self.obj_width
-            else:
-                gripper_state = 0.08
-            
-            # check if the goal will be reached at the next step
-            if np.linalg.norm(self.goal_pose[:3] - (self.current_pose[:3] + self.action[:3])) < 0.31:
-                gripper_state = 0.08
-            
-            # normalize gripper_state (-> 0 if current is equal to last)
-            if gripper_state == self.last_gripper_state:
-                gripper_state = 0
-            else:
-                self.last_gripper_state = gripper_state     
+        action[:3] *= self.panda_gym_action_correction              # panda gym correction
+        action[7] = self.obj_width if action[7] < 0 else 0.08       # gripper width correction
 
         # generate target pose
-        current_pose = transform(self.panda_to_gym, self.current_pose)
-        target_pose = transform(current_pose, action[:7])
+        panda_to_current = transform(self.panda_to_gym, self.gym_to_current)
+        panda_to_target = transform(panda_to_current, action[:7])
 
-        self._debugPrint("[panda] Current pose: {}".format(current_pose.tolist()), 'FG_WHITE')
+        self._debugPrint("[panda] Current pose: {}".format(panda_to_current.tolist()), 'FG_WHITE')
+        self._debugPrint("[base ] Action: {}".format(self.action.tolist()), 'FG_WHITE')
         self._debugPrint("[final] Action: {}".format(action.tolist()), 'FG_WHITE')
-        self._debugPrint("[panda] Target pose: {}\n".format(target_pose.tolist()), 'FG_WHITE')
+        self._debugPrint("[panda] Target pose: {}\n".format(panda_to_target.tolist()), 'FG_WHITE')
 
-        self.last_phase = self.actor.getPhase()         # update last_phase
-
-        return (target_pose.tolist(), gripper_state)
+        return panda_to_target.tolist() + [action[7]]
     
 
     def _getAction(self):
@@ -162,8 +123,8 @@ class GymEnvironment():
 
         # generate obs for AI
         obs = np.zeros(25)
-        obs[:3]    = self.current_pose[:3]     # grip_pos
-        obs[3:6]   = self.objOnStart_pose[:3]  # object_pos
+        obs[:3]    = self.gym_to_current[:3]     # grip_pos
+        obs[3:6]   = self.gym_to_objOnStart[:3]  # object_pos
         obs[6:9]   = 0                         # object_rel_pos
         obs[9:11]  = [finger0, finger1]        # gripper_state
         obs[11:14] = 0                         # object_rot
@@ -173,18 +134,17 @@ class GymEnvironment():
         obs[23:25] = 0                         # gripper_vel
 
         # adjust object_pos info for retract-ai (It use object_pos as current_pose info)
-        if self.actor.getPhase() == 3:
-            obs[3:6] = self.current_pose[:3]   # object_pos
+        if type(self.actor) == AiActor and self.actor.getPhase() == 3:
+            obs[3:6] = self.gym_to_current[:3]   # object_pos
 
         # adjust obs for E2EActor
         if type(self.actor) == E2EActor:
             obs = self.gym_obs
 
         # get action
-        return self.actor.getAction(obs, self.current_pose, self.current_gripper)
+        return self.actor.getAction(obs, self.gym_to_current, self.current_gripper)
 
 
-   
     def step(self):
         # get correct action for gym
         pos = self.action[:3].tolist()
@@ -198,8 +158,8 @@ class GymEnvironment():
     def checkGoal(self):
         if self.actor.goalIsAchieved():
             # get statistics
-            goal_pose  = transform(self.panda_to_gym, self.goal_pose)
-            end_pose = transform(self.panda_to_gym, self.current_pose)
+            goal_pose  = transform(self.panda_to_gym, self.gym_to_goal)
+            end_pose = transform(self.panda_to_gym, self.gym_to_current)
             
             stats = dict()
             stats['position_error'] = np.linalg.norm(goal_pose[:3] - end_pose[:3])
@@ -217,12 +177,12 @@ class GymEnvironment():
 
 
 
-def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENV_ENABLED, ACTOR):
+def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENV_ENABLED, ACTOR, OBJECT_WIDTH):
     # for writing
-    trajectory = list()
+    path = list()
 
     # initialize Actor
-    my_actor = GymEnvironment(DEBUG_ENV_ENABLED, ACTOR)
+    my_actor = GymEnvironment(DEBUG_ENV_ENABLED, OBJECT_WIDTH, ACTOR)
 
     # statistics
     results = {
@@ -236,24 +196,21 @@ def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENV_ENABLED, 
     # start world
     for episode in range(NUM_EPISODES):
         # reset actory
-        (target_pose, gripper_state) = my_actor.reset()
+        target = my_actor.reset()
 
-        # reset trajectory
-        trajectory.clear()
+        # reset path
+        path.clear()
 
         # add start pose
-        trajectory.append(gripper_state)
-        trajectory.append(target_pose)
+        path.append(target)
         
         # start episode
         for time_step in range(LEN_EPISODE):
-            # generate a new action from observations and create a target pose with it
-            (target_pose, gripper_state)  = my_actor.getTargetInfo()
+            # generate a new action from observations and create a target with it
+            target  = my_actor.getTarget()
 
-            # add target to trajectory and gripper state
-            if gripper_state != 0:
-                trajectory.append(gripper_state)
-            trajectory.append(target_pose)
+            # add target to path
+            path.append(target)
 
             # perform a step and get new observations
             my_actor.step()
@@ -278,29 +235,28 @@ def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENV_ENABLED, 
         # write to file
         if WRITE_ENABLE and input("Write to file? [y/n] ") == 'y':
             with open(FILE_PATH, 'w') as file_writer:
-                for info in trajectory:
-                    # target pose case
-                    if type(info) is list:
-                        for e in info:
-                            file_writer.write("{:>25}  ".format(e))
-                        file_writer.write("\n")
-
-                    # gripper state change case
-                    else:
-                        file_writer.write("{}\n".format(info))
+                for point in path:
+                    for e in point:
+                        file_writer.write("{:>25}  ".format(e))
+                    file_writer.write("\n")
     
 
     # Generate final statistics
     print("-----------------------------------")
-    print_col("All Episodes finish", 'FG_GREEN')
+    print_col("All Episodes finish", 'FG_YELLOW_BRIGHT')
 
     successes = results['goals_achived']
     # successes = results['gym_successes']
     fails = NUM_EPISODES - successes
-    print_col("accuracy: {}%".format(successes / float(NUM_EPISODES) * 100.0), 'FG_YELLOW_BRIGHT')
-    print_col("  - episodes:  {}".format(colorize(str(NUM_EPISODES), 'FG_WHITE')),        'FG_WHITE')
-    print_col("  - successes: {}".format(colorize(str(successes),    'FG_GREEN_BRIGHT')), 'FG_WHITE')
-    print_col("  - fails:     {}".format(colorize(str(fails),        'FG_RED_BRIGHT')),   'FG_WHITE')
+    percentage = successes / float(NUM_EPISODES) * 100.0
+    if percentage == 100:
+        percentage = colorize(str(percentage) + '%', 'FG_GREEN')
+    else:
+        percentage = colorize(str(percentage) + '%', 'FG_RED')
+    print_col("accuracy:      {}".format(percentage), 'FG_YELLOW_BRIGHT')
+    print_col("  - episodes:  {}".format(NUM_EPISODES), 'FG_WHITE')
+    print_col("  - successes: {}".format(successes), 'FG_WHITE')
+    print_col("  - fails:     {}".format(fails), 'FG_WHITE')
     print_col("  - gym successes: {}".format(results['gym_successes']), 'FG_WHITE')
     
     if successes > 0:
@@ -311,18 +267,21 @@ def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENV_ENABLED, 
 
 
 if __name__ == "__main__":
+    """Configure script here..."""
     DEBUG_ENV_ENABLED = False
     DEBUG_AI_ENABLED = False
-    NUM_EPISODES = 2
+    NUM_EPISODES = 1
     LEN_EPISODE = 150
     WRITE_ENABLE = True
-    # FILE_NAME = "trajectory_" + datetime.today().strftime('%Y-%m-%d-%H:%M:%S')
-    FILE_NAME = "trajectory_test"
+    # FILE_NAME = "path_" + datetime.today().strftime('%Y-%m-%d-%H:%M:%S')
+    FILE_NAME = "path"
 
-    ACTOR = ACTOR=AiActor(DEBUG_ENABLED=DEBUG_AI_ENABLED)
-    # ACTOR = ACTOR=E2EActor(DEBUG_ENABLED=DEBUG_AI_ENABLED)
-    # ACTOR = ACTOR=HandEngActor(DEBUG_ENABLED=DEBUG_AI_ENABLED)
+    ACTOR = AiActor(DEBUG_ENABLED=DEBUG_AI_ENABLED, MAX_EPISODE_STEPS = 50)
+    # ACTOR = E2EActor(DEBUG_ENABLED=DEBUG_AI_ENABLED, MAX_EPISODE_STEPS = 50)
+    # ACTOR = HandEngActor(DEBUG_ENABLED=DEBUG_AI_ENABLED, MAX_EPISODE_STEPS = 50)
+
+    OBJECT_WIDTH = 0.04  # [m]
            
 
-    file_path = os.path.join(os.path.dirname(__file__), "../data/trajectories/" + FILE_NAME + ".txt")
-    main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, file_path, DEBUG_ENV_ENABLED, ACTOR)
+    file_path = os.path.join(os.path.dirname(__file__), "../data/paths/" + FILE_NAME + ".txt")
+    main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, file_path, DEBUG_ENV_ENABLED, ACTOR, OBJECT_WIDTH)
