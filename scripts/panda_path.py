@@ -3,7 +3,6 @@
 from src.panda_moveit import PandaMoveitInterface
 import sys, rospy, moveit_commander
 from geometry_msgs.msg import Pose
-import copy
 import os
 
 
@@ -29,13 +28,15 @@ def parseLine(line):
     return (target[:7], target[7])
 
 
-def main(FILE_PATH):
+def main():
     try:
         # Initialize moveit_commander and rospy
         moveit_commander.roscpp_initialize(sys.argv)
-        rospy.init_node('panda_trajectory', anonymous=True)
+        rospy.init_node('panda_path', anonymous=True)
 
         # Get roslaunch parameters
+        file_name = rospy.get_param('~file_name', False)
+
         use_real_robot = rospy.get_param('~use_real_robot', False)
 
         grasp_option = dict()
@@ -47,18 +48,23 @@ def main(FILE_PATH):
         eef_step = rospy.get_param('~eef_step', 0.01)
         jump_threashould = rospy.get_param('~jump_threashould', 0.00)
 
+
         # Create panda moveit interface
         panda = PandaMoveitInterface(delay=1, real_robot=use_real_robot)
         
         # Reading file
-        file_reader = open(FILE_PATH, 'r')
+        FILE_PATH_NAME = os.path.join(os.path.dirname(__file__), "../data/paths/" + file_name + ".txt")
+        file_reader = open(FILE_PATH_NAME, 'r')
         start = True
         last_gripper = 0.08
         waypoints = list()
 
+        step = 1
         for line in file_reader:
             (pose, gripper) = parseLine(line)
             grasp = 0 if gripper == 0.08 else 1
+            print("[step {}]: {} and {}".format(step, pose, gripper))
+            step += 1
 
             if start:
                 print("Go to Start Pose...")
@@ -71,14 +77,15 @@ def main(FILE_PATH):
                 waypoints.append(getWaypoint(panda, pose))
                 if gripper != last_gripper:
                     panda.execute_cartesian_path(waypoints, eef_step, jump_threashould)
-                    # clear waypoints list
-                    waypoints = list()
+                    waypoints = list()  # clear waypoints list
                     if grasp:
                         panda.graspGripper(gripper, **grasp_option)
                     else:
                         panda.moveGripper(gripper, speed=gripper_speed)
                 last_gripper = gripper
-
+                
+        # Always open gripper to the end
+        panda.moveGripper(0.08, speed=gripper_speed)
 
     except rospy.ROSInterruptException:
         print("ROS interrupted")
@@ -89,8 +96,4 @@ def main(FILE_PATH):
 
 
 if __name__ == "__main__":
-    FILE_NAME = "path_test"
-
-
-    file_path = os.path.join(os.path.dirname(__file__), "../data/paths/" + FILE_NAME + ".txt")
-    main(file_path)
+    main()

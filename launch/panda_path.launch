@@ -1,4 +1,6 @@
 <launch>
+      <arg name="file_name" default="path_test"/>
+
       <arg name="use_real_robot" default="false"/>
 
       <arg name="gripper_speed" default="0.1"/>
@@ -16,6 +18,8 @@
             respawn="false" 
             output="screen">
 
+            <param name="file_name" value="$(arg file_name)"/>
+            
             <param name="use_real_robot" value="$(arg use_real_robot)"/>
 
             <param name="gripper_speed" value="$(arg gripper_speed)"/>

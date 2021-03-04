@@ -220,6 +220,12 @@ def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENV_ENABLED, 
 
             # check the output condition
             if goal_achived:
+                # add open gripper for E2E
+                if type(ACTOR) == E2EActor:
+                    open_gripper = path[-1].copy()
+                    open_gripper[7] = 0.08
+                    path.append(open_gripper)
+                # get stats
                 results['goals_achived'] += 1
                 results['gym_successes'] += stats['gym_success']
                 results['position_errors'].append(stats['position_error'])
@@ -274,10 +280,10 @@ if __name__ == "__main__":
     LEN_EPISODE = 150
     WRITE_ENABLE = True
     # FILE_NAME = "path_" + datetime.today().strftime('%Y-%m-%d-%H:%M:%S')
-    FILE_NAME = "path"
+    FILE_NAME = "path_e2e"
 
-    ACTOR = AiActor(DEBUG_ENABLED=DEBUG_AI_ENABLED, MAX_EPISODE_STEPS = 50)
-    # ACTOR = E2EActor(DEBUG_ENABLED=DEBUG_AI_ENABLED, MAX_EPISODE_STEPS = 50)
+    # ACTOR = AiActor(DEBUG_ENABLED=DEBUG_AI_ENABLED, MAX_EPISODE_STEPS = 50)
+    ACTOR = E2EActor(DEBUG_ENABLED=DEBUG_AI_ENABLED, MAX_EPISODE_STEPS = 50)
     # ACTOR = HandEngActor(DEBUG_ENABLED=DEBUG_AI_ENABLED, MAX_EPISODE_STEPS = 50)
 
     OBJECT_WIDTH = 0.04  # [m]

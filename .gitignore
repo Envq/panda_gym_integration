@@ -53,7 +53,7 @@ CATKIN_IGNORE
 
 **/__pycache__/
 examples/panda_gym/
-data/paths/paths_*.txt
+data/paths/path.txt
 venv-panda/
 
 demo-ai/
