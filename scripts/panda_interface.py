@@ -13,35 +13,41 @@ def main(HOST, PORT):
         rospy.init_node('panda_interface', anonymous=True)
 
         # Create gym interface
-        gym = GymInterface(HOST, PORT)
-
-        # Create panda moveit interface
-        panda = PandaMoveitInterface(delay=1)
-
         while True:
-            # Get current pose
-            current_pose = panda.getPose()
+            print("Wait for new connection...")
+            gym = GymInterface(HOST, PORT)
 
-            # Send current pose
-            gym.sendCurrentState(current_pose)
+            # Create panda moveit interface
+            panda = PandaMoveitInterface(delay=1)
 
-            # Get goal pose
-            goal_pose = gym.getGoalState()
-            
-            # Check close
-            if goal_pose == 'close':
-                break
+            while True:
+                # Get current pose
+                current_pose = panda.getPose()
 
-            # Run goal joints
-            success = panda.movePose(goal_pose)
-            print("Success? {}".format(success))
-            if not success:
-                print("Error! abort")
-                gym.sendError()
-                break
+                # Send current pose
+                gym.sendCurrentState(current_pose)
+
+                # Get goal pose
+                goal_pose = gym.getGoalState()
+                
+                # Check close
+                if goal_pose == 'close':
+                    break
+
+                # Run goal joints
+                success = panda.movePose(goal_pose)
+                print("Success? {}".format(success))
+                if not success:
+                    print("Error! abort")
+                    gym.sendError()
+                    break
+            print("------------------\n")
 
     except rospy.ROSInterruptException:
         print("ROS interrupted")
+
+    except KeyboardInterrupt:
+        print("Keyboard interrupted")
 
 
 

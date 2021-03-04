@@ -4,11 +4,11 @@
 import sys
 sys.path.append("../scripts/")
 from src.panda_server import PandaInterface
-from src.utils import quaternion_multiply, transform
+from src.utils import transform, transform_inverse
 from src.colors import print_col, colorize
 
 # AI
-from ai.panda_actors import AiActor
+from ai.panda_actors import AiActor, HandEngActor
 
 # Other
 import numpy as np
@@ -16,16 +16,17 @@ import numpy as np
 
 
 class MoveitEnvironment():
-    def __init__(self, DEBUG_ENABLED, HOST, PORT, ACTOR):
+    def __init__(self, DEBUG_ENABLED, ACTOR, OBJECT_WIDTH, HOST, PORT):
         # attributes
         self.debug_enabled = DEBUG_ENABLED
-        self.panda_to_gym = np.array([-0.6919, -0.7441, -0.3,  0, 0, 0, 1]) # [panda -> gym] trasformation
-        self.gym_to_panda = np.array([ 0.6919,  0.7441,  0.3,  0, 0, 0, 1]) # [gym -> panda] trasformation
-        self.gym_to_panda[6] = 1
-        self.obj_width = 0.04                    # [m]
+        self.obj_width = OBJECT_WIDTH
         # panda_gym internally applies this adjustment to actions (in _set_action()), 
         # so you need to apply it here as well 
         self.panda_gym_action_correction = 0.05  # (limit maximum change in position)
+
+        # transformations
+        self.panda_to_gym = np.array([-0.6919, -0.7441, -0.3,  0, 0, 0, 1]) # [panda -> gym]
+        self.gym_to_panda = transform_inverse(self.panda_to_gym)            # [gym -> panda]
 
         # create panda interface
         self.panda = PandaInterface(HOST, PORT)
@@ -33,7 +34,6 @@ class MoveitEnvironment():
 
         # create actor
         self.actor = ACTOR
-        self.actor.setMaxEpisodeSteps(50)
                     
     
     def _debugPrint(self, msg, color='FG_DEFAULT'):
@@ -43,15 +43,13 @@ class MoveitEnvironment():
 
     def reset(self):
         # get object pose on start
-        self.objOnStart_pose = np.array([0.34, 0.0, 0.2,  0.0, 0.0, 0.0, 1.0])
-        # self.objOnStart_pose = np.array([0.5048428215095773, -0.07165085976476693, 0.125, 0.0, 0.0, 0.0, 1.0])
-        # self.objOnStart_pose = np.array([0.6789352992277409, -0.08219292981645365, 0.125, 0.0, 0.0, 0.0, 1.0])
+        # self.objOnStart_pose = np.array([0.34, 0.0, 0.2,  0.0, 0.0, 0.0, 1.0])
+        self.objOnStart_pose = np.array([0.618024652107368, -0.018727033651026792, 0.125,  0.0, 0.0, 0.0, 1.0])
         self.gym_to_objOnStart = transform(self.gym_to_panda, self.objOnStart_pose)
         
         # get goal pose
-        self.goal_pose = np.array([0.38, 0.0, 0.2,  0.0, 0.0, 0.0, 1.0])
-        # self.goal_pose = np.array([0.7029948442091138, -0.04770550454761002, 0.2727019519554263, 0.0, 0.0, 0.0, 1.0])
-        # self.goal_pose = np.array([0.6148329752153725, 0.14252585763032344, 0.2207092613994081, 0.0, 0.0, 0.0, 1.0])
+        # self.goal_pose = np.array([0.38, 0.0, 0.2,  0.0, 0.0, 0.0, 1.0])
+        self.goal_pose = np.array([0.4898394521073681, -0.07501663365102673, 0.2, 0.0, 0.0, 0.0, 1.0])
         gym_to_goal = transform(self.gym_to_panda, self.goal_pose)
         
         # start msg
@@ -173,9 +171,9 @@ class MoveitEnvironment():
 
 
 
-def main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENV_ENABLED, DEBUG_AI_ENABLED, HOST, PORT):
+def main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENV_ENABLED, ACTOR, OBJECT_WIDTH, HOST, PORT):
     # initialize Actor
-    my_actor = MoveitEnvironment(DEBUG_ENV_ENABLED, HOST, PORT, ACTOR=AiActor(DEBUG_ENABLED=DEBUG_AI_ENABLED))
+    my_actor = MoveitEnvironment(DEBUG_ENV_ENABLED, ACTOR, OBJECT_WIDTH, HOST, PORT)
 
     # statistics
     results = {
@@ -242,6 +240,10 @@ if __name__ == "__main__":
     DEBUG_AI_ENABLED = False
     NUM_EPISODES = 1
     LEN_EPISODE = 150
+    OBJECT_WIDTH = 0.04  # [m]
+
+    ACTOR = AiActor(DEBUG_ENABLED=DEBUG_AI_ENABLED, MAX_EPISODE_STEPS = 50)
+    # ACTOR = HandEngActor(DEBUG_ENABLED=DEBUG_AI_ENABLED, MAX_EPISODE_STEPS = 50)
 
 
-    main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENV_ENABLED, DEBUG_AI_ENABLED, HOST, PORT)
+    main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENV_ENABLED, ACTOR, OBJECT_WIDTH, HOST, PORT)

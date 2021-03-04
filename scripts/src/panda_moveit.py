@@ -25,6 +25,32 @@ class PandaMoveitInterface(object):
         super(PandaMoveitInterface, self).__init__()
         # arm settings
         self.arm = moveit_commander.MoveGroupCommander("panda_arm")
+        self.arm.allow_replanning(True)
+        # self.arm.set_planner_id('SBLkConfigDefault')
+        # self.arm.set_planner_id('ESTkConfigDefault')
+        # self.arm.set_planner_id('LBKPIECEkConfigDefault')
+        # self.arm.set_planner_id('BKPIECEkConfigDefault')
+        # self.arm.set_planner_id('KPIECEkConfigDefault')
+        # self.arm.set_planner_id('RRTkConfigDefault')
+        # self.arm.set_planner_id('RRTConnectkConfigDefault')
+        # self.arm.set_planner_id('RRTstarkConfigDefault')
+        # self.arm.set_planner_id('TRRTkConfigDefault')
+        # self.arm.set_planner_id('PRMkConfigDefault')
+        # self.arm.set_planner_id('PRMstarkConfigDefault')
+        # self.arm.set_planner_id('FMTkConfigDefault')
+        # self.arm.set_planner_id('BFMTkConfigDefault')
+        # self.arm.set_planner_id('PDSTkConfigDefault')
+        # self.arm.set_planner_id('STRIDEkConfigDefault')
+        # self.arm.set_planner_id('BiTRRTkConfigDefault')
+        # self.arm.set_planner_id('LBTRRTkConfigDefault')
+        # self.arm.set_planner_id('BiESTkConfigDefault')
+        # self.arm.set_planner_id('ProjESTkConfigDefault')
+        # self.arm.set_planner_id('LazyPRMkConfigDefault')
+        # self.arm.set_planner_id('LazyPRMstarkConfigDefault')
+        # self.arm.set_planner_id('SPARSkConfigDefault')
+        # self.arm.set_planner_id('SPARStwokConfigDefault')
+        # self.arm.set_planner_id('TrajOptDefault')
+
 
         # transformations
         self.wrist_to_tcp = [0.0, 0.0, 0.1035, 0.923879533, -0.382683432, 0.0, 0.0]

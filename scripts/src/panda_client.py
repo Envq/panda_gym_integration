@@ -16,7 +16,14 @@ class GymInterface():
         # Create a TCP socket at client side
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         print("TCP client ready")
-        self.s.connect((HOST, PORT))
+
+        connected = False
+        while not connected:
+            try:
+                self.s.connect((HOST, PORT))
+                connected = True
+            except Exception as e:
+                pass #Do nothing, just try again
         print("TCP client connected to server {}:{}".format(HOST, PORT))
     
 
