@@ -1,16 +1,4 @@
 <launch>
-      <arg name="file_name" default="path_test"/>
-
-      <arg name="use_real_robot" default="false"/>
-
-      <arg name="gripper_speed" default="0.1"/>
-      <arg name="grasp_force" default="20.0"/>
-      <arg name="grasp_epsilon_inner" default="0.02"/>
-      <arg name="grasp_epsilon_outer" default="0.02"/>
-
-      <arg name="eef_step" default="0.01"/>
-      <arg name="jump_threashould" default="0.0"/>
-
 
       <node pkg="panda_gym_integration" 
             type="panda_path.py" 
@@ -18,19 +6,20 @@
             respawn="false" 
             output="screen">
 
-            <param name="file_name" value="$(arg file_name)"/>
-            
-            <param name="use_real_robot" value="$(arg use_real_robot)"/>
+            <!-- parameters-->
+            <param name="mode" type="int" value="1"/>
+            <param name="mode2_delay" type="double" value="1.0"/>
+            <param name="file_name" type="string" value="path_e2e"/>
+            <param name="real_robot" type="bool" value="false"/>
 
-            <param name="gripper_speed" value="$(arg gripper_speed)"/>
-            <param name="grasp_force" value="$(arg grasp_force)"/>
-            <param name="grasp_epsilon_inner" value="$(arg grasp_epsilon_inner)"/>
-            <param name="grasp_epsilon_outer" value="$(arg grasp_epsilon_outer)"/>
+            <param name="gripper_speed" type="double" value="0.1"/>
+            <param name="grasp_speed" type="double" value="0.1"/>
+            <param name="grasp_force" type="double" value="20.0"/>
+            <param name="grasp_epsilon_inner" type="double" value="0.02"/>
+            <param name="grasp_epsilon_outer" type="double" value="0.02"/>
 
-            <param name="eef_step" value="$(arg eef_step)"/>
-            <param name="jump_threashould" value="$(arg jump_threashould)"/>
-
+            <param name="eef_step" type="double" value="0.01"/>
+            <param name="jump_threashould" type="double" value="0.0"/>
       </node>
+      
 </launch>
-
-
