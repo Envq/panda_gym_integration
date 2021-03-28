@@ -3,16 +3,15 @@
 # ROS and Moveit
 import rospy
 import moveit_commander
-from geometry_msgs.msg import Pose
+from rospy.rostime import Duration
 
 # Other
 import sys
 import os
-from rospy.rostime import Duration
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../panda_controller/scripts")))
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../panda_controller/scripts/src")))
 
-# Custom
+# panda_controller
 from panda_interface_moveit import PandaInterfaceMoveit
 
 

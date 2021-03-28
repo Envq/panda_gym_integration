@@ -31,6 +31,8 @@ Follow **Dependencies and building** section [here](https://github.com/Envq/pand
 ~~~
 cd ~/panda_ws/src/
 
+pip3 install --user numpy panda_gym torch
+
 git clone https://github.com/Envq/panda_gym_integration.git
 
 cd ~/panda_ws

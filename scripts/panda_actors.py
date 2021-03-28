@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
 
-# Custom
-import sys
-sys.path.append("../../scripts/")
-from src.utils import quaternion_multiply, transform
-from src.colors import print_col, colorize
+# AI
+import torch
 
 # Other
-from .models import actor
-from .arguments import get_args
-import torch
 import numpy as np
 import time
+import sys, os
+
+# panda_controller
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../panda_controller/scripts/src")))
+from utils import quaternion_multiply, transform
+from colors import print_col, colorize
+
+# Custom
+from ai.models import actor
+from ai.arguments import get_args
 
 
 

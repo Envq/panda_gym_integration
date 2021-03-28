@@ -7,7 +7,7 @@
             output="screen">
 
             <!-- parameters-->
-            <param name="mode" type="int" value="1"/>
+            <param name="mode" type="int" value="2"/>
             <param name="mode2_delay" type="double" value="1.0"/>
             <param name="file_name" type="string" value="path_e2e"/>
             <param name="real_robot" type="bool" value="false"/>

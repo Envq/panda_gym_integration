@@ -4,6 +4,7 @@
         "/opt/ros/noetic/lib/python3/dist-packages/",
         "${workspaceFolder}/../panda_controller/scripts/",
         "${workspaceFolder}/../panda_controller/scripts/src/",
+        "~/.local/lib/python3.8/site-packages/"
     ],
     "python.analysis.extraPaths": [
         "${workspaceFolder}/scripts/",
@@ -11,6 +12,7 @@
         "${workspaceFolder}/../panda_controller/scripts/",
         "${workspaceFolder}/../panda_controller/scripts/src/",
         "${workspaceFolder}/../../devel/lib/python3/dist-packages",
-        "/opt/ros/noetic/lib/python3/dist-packages/"
+        "/opt/ros/noetic/lib/python3/dist-packages/",
+        "~/.local/lib/python3.8/site-packages/"
     ]
 }

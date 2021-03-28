@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 
-import sys
-sys.path.append("../scripts/")
+# ROS and Moveit
+import rospy
+import moveit_commander
 
-from src.panda_server import PandaInterface
-from src.colors import print_col, colorize
+# Other
 import numpy as np
+import sys, os
 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../panda_controller/scripts/src")))
+
+# panda_controller
+from colors import print_col, colorize
+from panda_interface_moveit import PandaInterfaceMoveit
 
 
 class PandaActor():

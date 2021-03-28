@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
 
-# Custom
-import sys
-sys.path.append("../scripts/")
-from src.utils import transform
-from src.colors import print_col, colorize
-
 # Panda-gym and AI
 import gym
 import panda_gym
-from ai.panda_actors import AiActor, HandEngActor, E2EActor
 
 # Other
 import numpy as np
 from datetime import datetime
-import os
+import sys, os
+
+# panda_controller
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../panda_controller/scripts/src")))
+from utils import transform
+from colors import print_col, colorize
+
+# Custom
+from panda_actors import AiActor, HandEngActor, E2EActor
 
 
 
