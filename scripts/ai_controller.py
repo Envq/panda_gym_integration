@@ -1,44 +1,58 @@
 #!/usr/bin/env python3
 
-# Custom
-import sys
-sys.path.append("../scripts/")
-from src.panda_server import PandaInterface
-from src.utils import transform, transform_inverse
-from src.colors import print_col, colorize
-
-# AI
-from ai.panda_actors import AiActor, HandEngActor
+# Frankx
+from frankx import LinearMotion, Affine, Robot
 
 # Other
 import numpy as np
+import sys, os
+
+# panda_controller
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../panda_controller/scripts/src")))
+from utils import transform, transform_inverse
+from colors import print_col, colorize
+
+# Custom
+from panda_actors import AiActor, HandEngActor
 
 
 
-class MoveitEnvironment():
-    def __init__(self, DEBUG_ENABLED, ACTOR, OBJECT_WIDTH, HOST, PORT):
+class FrankxEnvironment():
+    def __init__(self, DEBUG_ENABLED, ACTOR, IP, DYNAMIC_REL):
         # attributes
         self.debug_enabled = DEBUG_ENABLED
-        self.obj_width = OBJECT_WIDTH
         # panda_gym internally applies this adjustment to actions (in _set_action()), 
         # so you need to apply it here as well 
         self.panda_gym_action_correction = 0.05  # (limit maximum change in position)
+        self.last_target_gripper = 1
 
         # transformations
         self.panda_to_gym = np.array([-0.6919, -0.7441, -0.3,  0, 0, 0, 1]) # [panda -> gym]
         self.gym_to_panda = transform_inverse(self.panda_to_gym)            # [gym -> panda]
 
         # create panda interface
-        self.panda = PandaInterface(HOST, PORT)
-        self.panda.getCurrentState() # get panda-client connection
+        self.arm = Robot(IP)
+        self.gripper = self.arm.get_gripper()
+        self.arm.set_default_behavior()
+        self.arm.recover_from_errors()
 
-        # create actor
+        # Reduce the acceleration and velocity dynamic
+        self.arm.set_dynamic_rel(DYNAMIC_REL)
+
+        # create AI actor
         self.actor = ACTOR
                     
     
     def _debugPrint(self, msg, color='FG_DEFAULT'):
         if self.debug_enabled: 
             print_col(msg, color)
+    
+
+    def _moveArm(self, pose):
+        position = pose[:3]
+        pose = Affine(position[0], position[1], position[2])
+        motion = LinearMotion(pose)
+        self.arm.move(motion)
 
 
     def reset(self):
@@ -57,8 +71,9 @@ class MoveitEnvironment():
         start_gripper = 0.08
         start_grasp = 0
 
-        # send start state msg
-        self.panda.sendGoalState(start_pose + [start_gripper, start_grasp])
+        # go to start pose
+        self._moveArm(start_pose)
+        self.gripper.move(self.gripper.max_width)
                 
         # generate pre_grasp pose
         self.preGrasp_pose = self.objOnStart_pose.copy()
@@ -80,19 +95,14 @@ class MoveitEnvironment():
 
     
     def _getObs(self):
-        # get current state msg
-        current_msg = self.panda.getCurrentState()
-
-        # Catch real-panda errors
-        if current_msg == "error":
-            print_col("Abort", 'FG_RED')
-            sys.exit()
+        # get current pose
+        current = self.arm.current_pose().vector().tolist()
 
         # get current tcp pose (on panda_base frame)            
-        self.current_pose = np.array(current_msg[:7])       # grip_pos
+        self.current_pose = np.array(current[:3] + [0, 0, 0, 1])       # grip_pos
 
         # get current fingers width
-        self.current_gripper = current_msg[7]               # gripper_state
+        self.current_gripper = self.gripper.width()                    # gripper_state
 
 
     def getTargetInfo(self):
@@ -108,10 +118,7 @@ class MoveitEnvironment():
         self.target_pose[3:] = [0, 0, 0, 1]
 
         # generate target gripper
-        self.target_gripper = self.obj_width if action[7] < 0 else 0.08
-
-        # generate target grasp
-        self.target_grasp = 1 if self.action[7] < 0 else 0
+        self.target_gripper = action[7]
 
         # debug
         self._debugPrint("[panda] Current pose: {}".format(self.current_pose.tolist()), 'FG_WHITE')
@@ -147,8 +154,13 @@ class MoveitEnvironment():
 
 
     def step(self):
-        # send goal
-        self.panda.sendGoalState(self.target_pose.tolist() + [self.target_gripper, self.target_grasp])
+        self._moveArm(self.target_pose)
+        if self.target_gripper != self.last_target_gripper:
+            if self.target_gripper < 0:
+                self.gripper.clamp()
+            else:
+                self.gripper.move(self.gripper.max_width)
+        self.last_target_gripper = self.target_gripper
 
         # get observation 
         self._getObs()
@@ -165,15 +177,10 @@ class MoveitEnvironment():
             return (False, None)
 
 
-    def __del__(self):
-        self._debugPrint("close communication", 'FG_MAGENTA')
-        self.panda.sendClose()
 
-
-
-def main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENV_ENABLED, ACTOR, OBJECT_WIDTH, HOST, PORT):
+def main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENV_ENABLED, ACTOR, IP, DYNAMIC_REL):
     # initialize Actor
-    my_actor = MoveitEnvironment(DEBUG_ENV_ENABLED, ACTOR, OBJECT_WIDTH, HOST, PORT)
+    actor_in_env = FrankxEnvironment(DEBUG_ENV_ENABLED, ACTOR, IP, DYNAMIC_REL)
 
     # statistics
     results = {
@@ -186,18 +193,18 @@ def main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENV_ENABLED, ACTOR, OBJECT_WIDTH, HOST
     # start world
     for episode in range(NUM_EPISODES):
         # reset actory
-        my_actor.reset()
+        actor_in_env.reset()
         
         # start episode
         for timer in range(LEN_EPISODE):
             # generate a new action from observations and create a target pose with it
-            my_actor.getTargetInfo()
+            actor_in_env.getTargetInfo()
 
             # perform a step and get new observations
-            my_actor.step()
+            actor_in_env.step()
 
             # check goal
-            (goal_achived, stats) = my_actor.checkGoal()
+            (goal_achived, stats) = actor_in_env.checkGoal()
 
             # check the output condition
             if goal_achived:
@@ -234,16 +241,14 @@ def main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENV_ENABLED, ACTOR, OBJECT_WIDTH, HOST
 
 if __name__ == "__main__":
     # PARAMETERS
-    HOST = "127.0.0.1"
-    PORT = 2000
+    IP = '192.168.1.2'
     DEBUG_ENV_ENABLED = True
     DEBUG_AI_ENABLED = False
     NUM_EPISODES = 1
     LEN_EPISODE = 150
-    OBJECT_WIDTH = 0.04  # [m]
+    DYNAMIC_REL = 0.1
 
     ACTOR = AiActor(DEBUG_ENABLED=DEBUG_AI_ENABLED, MAX_EPISODE_STEPS = 50)
     # ACTOR = HandEngActor(DEBUG_ENABLED=DEBUG_AI_ENABLED, MAX_EPISODE_STEPS = 50)
 
-
-    main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENV_ENABLED, ACTOR, OBJECT_WIDTH, HOST, PORT)
+    main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENV_ENABLED, ACTOR, IP, DYNAMIC_REL)
