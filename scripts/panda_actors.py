@@ -14,8 +14,8 @@ from utils import quaternion_multiply, transform
 from colors import print_col, colorize
 
 # Custom
-from ai.models import actor
-from ai.arguments import get_args
+from src.ai.models import actor
+from src.ai.arguments import get_args
 
 
 
@@ -45,15 +45,15 @@ class AiActor():
         self.args = get_args()
 
         # load pre-grasp model [approach]
-        model_path_approach = "ai/" + self.args.save_dir + self.args.env_name + '/approach.pt'
+        model_path_approach = "src/ai/" + self.args.save_dir + self.args.env_name + '/approach.pt'
         self.o_mean_approach, self.o_std_approach, self.g_mean_approach, self.g_std_approach, model_approach = torch.load(model_path_approach, map_location=lambda storage, loc: storage)
         
         # load grasp model [manipulate]
-        model_path_manipulate = "ai/" + self.args.save_dir + self.args.env_name + '/manipulate.pt'
+        model_path_manipulate = "src/ai/" + self.args.save_dir + self.args.env_name + '/manipulate.pt'
         self.o_mean_manipulate, self.o_std_manipulate, self.g_mean_manipulate, self.g_std_manipulate, model_manipulate = torch.load(model_path_manipulate, map_location=lambda storage, loc: storage)
         
         # load post-grasp model [retract]
-        model_path_retract = "ai/" + self.args.save_dir + self.args.env_name + '/retract.pt'
+        model_path_retract = "src/ai/" + self.args.save_dir + self.args.env_name + '/retract.pt'
         self.o_mean_retract, self.o_std_retract, self.g_mean_retract, self.g_std_retract, model_retract = torch.load(model_path_retract, map_location=lambda storage, loc: storage)
         
         # get the environment params
@@ -232,7 +232,7 @@ class E2EActor():
         self.args = get_args()
 
         # load model [e2e]
-        model_path = "ai/" + self.args.save_dir + self.args.env_name + '/e2e.pt'
+        model_path = "src/ai/" + self.args.save_dir + self.args.env_name + '/e2e.pt'
         self.o_mean, self.o_std, self.g_mean, self.g_std, model = torch.load(model_path, map_location=lambda storage, loc: storage)
         
         # get the environment params

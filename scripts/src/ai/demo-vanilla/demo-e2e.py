@@ -1,9 +1,13 @@
-import torch
-from ai.models import actor
-from ai.arguments import get_args
+#!/usr/bin/env python3
 import gym
+import torch
 import panda_gym
 import numpy as np
+import sys, os
+sys.path.append("../")
+from models import actor
+from arguments import get_args
+
 
 # process the inputs
 def process_inputs(o, g, o_mean, o_std, g_mean, g_std, args):
@@ -18,9 +22,10 @@ def process_inputs(o, g, o_mean, o_std, g_mean, g_std, args):
 if __name__ == '__main__':
     # get arguments
     args = get_args()
-    
+
     # load the model param
-    model_path = "ai/" + args.save_dir + args.env_name + '/e2e.pt'
+    parent_path = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)), os.pardir))
+    model_path = str(parent_path) + "/" + args.save_dir + args.env_name + '/e2e.pt'
     o_mean, o_std, g_mean, g_std, model = torch.load(model_path, map_location=lambda storage, loc: storage)
     
     # create the environment
@@ -35,7 +40,7 @@ if __name__ == '__main__':
                   'action': env.action_space.shape[0], 
                   'action_max': env.action_space.high[0],
                   }
-    #
+
     #  create the actor network
     actor_network = actor(env_params)
     actor_network.load_state_dict(model)

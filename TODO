@@ -1,3 +1,2 @@
-- adjust demo-hand-eng
 - adjust ai_controller
-- adjust simple_controller
+- move panda_actors into ai/

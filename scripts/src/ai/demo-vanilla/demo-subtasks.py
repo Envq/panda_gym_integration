@@ -1,9 +1,12 @@
+#!/usr/bin/env python3
 import torch
-from ai.models import actor
-from ai.arguments import get_args
 import gym
 import panda_gym
 import numpy as np
+import sys, os
+sys.path.append("../")
+from models import actor
+from arguments import get_args
 
 # process the inputs
 def process_inputs(o, g, o_mean, o_std, g_mean, g_std, args):
@@ -18,14 +21,17 @@ def process_inputs(o, g, o_mean, o_std, g_mean, g_std, args):
 
 if __name__ == '__main__':
     args = get_args()
+
+    parent_path = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)), os.pardir))
+    
     # load the model param
-    model_path_approach = "ai/" + args.save_dir + args.env_name + '/approach.pt'
+    model_path_approach = str(parent_path) + "/" + args.save_dir + args.env_name + '/approach.pt'
     o_mean_approach, o_std_approach, g_mean_approach, g_std_approach, model_approach = torch.load(model_path_approach, map_location=lambda storage, loc: storage)
     
-    model_path_manipulate = "ai/" + args.save_dir + args.env_name + '/manipulate.pt'
+    model_path_manipulate = str(parent_path) + "/" + args.save_dir + args.env_name + '/manipulate.pt'
     o_mean_manipulate, o_std_manipulate, g_mean_manipulate, g_std_manipulate, model_manipulate = torch.load(model_path_manipulate, map_location=lambda storage, loc: storage)
     
-    model_path_retract = "ai/" + args.save_dir + args.env_name + '/retract.pt'
+    model_path_retract = str(parent_path) + "/" + args.save_dir + args.env_name + '/retract.pt'
     o_mean_retract, o_std_retract, g_mean_retract, g_std_retract, model_retract = torch.load(model_path_retract, map_location=lambda storage, loc: storage)
     
     # create the environment
