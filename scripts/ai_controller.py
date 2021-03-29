@@ -34,7 +34,7 @@ class FrankxEnvironment():
         self.arm = Robot(IP)
         self.gripper = self.arm.get_gripper()
         self.arm.set_default_behavior()
-        self.arm.recover_from_errors()
+        # self.arm.recover_from_errors()
 
         # Reduce the acceleration and velocity dynamic
         self.arm.set_dynamic_rel(DYNAMIC_REL)
@@ -55,19 +55,17 @@ class FrankxEnvironment():
         self.arm.move(motion)
 
 
-    def reset(self):
+    def reset(self, START_POSE, OBJ_POSE, GOAL_POSE):
         # get object pose on start
-        # self.objOnStart_pose = np.array([0.34, 0.0, 0.2,  0.0, 0.0, 0.0, 1.0])
-        self.objOnStart_pose = np.array([0.618024652107368, -0.018727033651026792, 0.125,  0.0, 0.0, 0.0, 1.0])
+        self.objOnStart_pose = np.array(OBJ_POSE)
         self.gym_to_objOnStart = transform(self.gym_to_panda, self.objOnStart_pose)
         
         # get goal pose
-        # self.goal_pose = np.array([0.38, 0.0, 0.2,  0.0, 0.0, 0.0, 1.0])
-        self.goal_pose = np.array([0.4898394521073681, -0.07501663365102673, 0.2, 0.0, 0.0, 0.0, 1.0])
+        self.goal_pose = np.array(GOAL_POSE)
         gym_to_goal = transform(self.gym_to_panda, self.goal_pose)
         
         # start msg
-        start_pose = [0.6014990053878944, 1.5880450818915202e-06, 0.29842061906465916, -3.8623752044513406e-06, -0.0013073068882995874, -5.91084615330739e-06, 0.9999991454490569]
+        start_pose = START_POSE
         start_gripper = 0.08
         start_grasp = 0
 
@@ -178,7 +176,7 @@ class FrankxEnvironment():
 
 
 
-def main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENV_ENABLED, ACTOR, IP, DYNAMIC_REL):
+def main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENV_ENABLED, ACTOR, IP, DYNAMIC_REL, START_POSE, OBJ_POSE, GOAL_POSE):
     # initialize Actor
     actor_in_env = FrankxEnvironment(DEBUG_ENV_ENABLED, ACTOR, IP, DYNAMIC_REL)
 
@@ -193,8 +191,8 @@ def main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENV_ENABLED, ACTOR, IP, DYNAMIC_REL):
     # start world
     for episode in range(NUM_EPISODES):
         # reset actory
-        actor_in_env.reset()
-        
+        actor_in_env.reset(START_POSE[episode], OBJ_POSE[episode], GOAL_POSE[episode])
+                
         # start episode
         for timer in range(LEN_EPISODE):
             # generate a new action from observations and create a target pose with it
@@ -246,9 +244,26 @@ if __name__ == "__main__":
     DEBUG_AI_ENABLED = False
     NUM_EPISODES = 1
     LEN_EPISODE = 150
-    DYNAMIC_REL = 0.1
+    DYNAMIC_REL = 0.07
+
+
+    START_POSE = [ # NOT CHANGE IT...
+            [0.6014990053878944, 1.5880450818915202e-06, 0.29842061906465916,  -3.8623752044513406e-06, -0.0013073068882995874, -5.91084615330739e-06, 0.9999991454490569],
+            [0.6014990053878944, 1.5880450818915202e-06, 0.29842061906465916,  -3.8623752044513406e-06, -0.0013073068882995874, -5.91084615330739e-06, 0.9999991454490569],
+            [0.4, 0.0, 0.4,  0.0, 0.0, 0.0, 1.0], #run this to see the error
+        ]
+    OBJ_POSE = [
+            [0.618024652107368, -0.018727033651026792, 0.125,  0.0, 0.0, 0.0, 1.0],
+            [0.50, 0.0, 0.2,  0.0, 0.0, 0.0, 1.0],
+        ]
+    GOAL_POSE = [
+            [0.4898394521073681, -0.07501663365102673, 0.2,  0.0, 0.0, 0.0, 1.0],
+            [0.40, 0.0, 0.4,  0.0, 0.0, 0.0, 1.0],
+        ]
+
+
 
     ACTOR = AiActor(DEBUG_ENABLED=DEBUG_AI_ENABLED, MAX_EPISODE_STEPS = 50)
     # ACTOR = HandEngActor(DEBUG_ENABLED=DEBUG_AI_ENABLED, MAX_EPISODE_STEPS = 50)
 
-    main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENV_ENABLED, ACTOR, IP, DYNAMIC_REL)
+    main(NUM_EPISODES, LEN_EPISODE, DEBUG_ENV_ENABLED, ACTOR, IP, DYNAMIC_REL, START_POSE, OBJ_POSE, GOAL_POSE)
