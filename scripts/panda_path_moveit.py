@@ -32,8 +32,10 @@ def main():
         # Get roslaunch parameters
         mode = rospy.get_param('~mode', 1)
         mode2_delay = rospy.get_param('~mode2_delay', 1.0)
+        mode2_wait = rospy.get_param('~mode2_wait', False)
         file_name = rospy.get_param('~file_name', "path_test")
         real_robot = rospy.get_param('~real_robot', False)
+        arm_speed = rospy.get_param('~arm_speed', 0.1)
 
         gripper_speed = rospy.get_param('~gripper_speed', 0.1)
         grasp_option = dict()
@@ -50,7 +52,7 @@ def main():
         print(real_robot)
         panda = PandaInterfaceMoveit(\
                             delay=1,\
-                            arm_velocity_factor=0.5,\
+                            arm_velocity_factor=arm_speed,\
                             startup_homing=False,\
                             real_robot=real_robot)
         
@@ -78,7 +80,7 @@ def main():
                 if mode == 1:
                     waypoints.append(pose)
                 elif mode == 2:
-                    print("Success: ", panda.moveArmPoseTCP(pose, wait_execution=False))
+                    print("Success: ", panda.moveArmPoseTCP(pose, wait_execution=mode2_wait))
                     rospy.sleep(Duration(mode2_delay))
 
                 if gripper != last_gripper:

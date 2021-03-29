@@ -21,11 +21,15 @@ This package was tested with real robot with:
 - [franka_ros](https://github.com/frankaemika/franka_ros) 0.7.1
 - [panda_moveit_config](https://github.com/ros-planning/panda_moveit_config) 0.7.5
 - [panda_controller](https://github.com/Envq/panda_controller) noetic_dev
+- [frankx](https://github.com/pantor/frankx) cc81e52045be280ee2f6b928e954d05ccc7798ad
 
 
 
 ## Dependencies and building
 Follow **Dependencies and building** section [here](https://github.com/Envq/panda_controller) 
+
+Install [frankx](https://github.com/pantor/frankx)
+
 
 **Get panda_gym_integration:**
 ~~~
