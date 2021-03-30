@@ -9,7 +9,7 @@ import sys, os
 
 # panda_controller
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../panda_controller/scripts/src")))
-from utils import transform, transform_inverse
+from utils import transform, transform_inverse, quaternion_from_euler, euler_from_quaternion
 from colors import print_col, colorize
 
 # Custom
@@ -50,7 +50,9 @@ class FrankxEnvironment():
 
     def _moveArm(self, pose):
         position = pose[:3]
-        pose = Affine(position[0], position[1], position[2])
+        orientation = euler_from_quaternion(pose[3:])
+        #orientation = [0, 0, 0, 1] #orientation fixed
+        pose = Affine(*position, *orientation)
         motion = LinearMotion(pose)
         self.arm.move(motion)
 
@@ -64,14 +66,9 @@ class FrankxEnvironment():
         self.goal_pose = np.array(GOAL_POSE)
         gym_to_goal = transform(self.gym_to_panda, self.goal_pose)
         
-        # start msg
-        start_pose = START_POSE
-        start_gripper = 0.08
-        start_grasp = 0
-
-        # go to start pose
-        self._moveArm(start_pose)
-        self.gripper.move(self.gripper.max_width)
+        # initialize panda
+        self._moveArm(START_POSE)                   # go to start pose
+        self.gripper.move(self.gripper.max_width)   # open gripper
                 
         # generate pre_grasp pose
         self.preGrasp_pose = self.objOnStart_pose.copy()
@@ -95,9 +92,12 @@ class FrankxEnvironment():
     def _getObs(self):
         # get current pose
         current = self.arm.current_pose().vector().tolist()
+        position = current[:3]
+        orientation = quaternion_from_euler(current[3:])
+        #orientation = [0, 0, 0, 1] #orientation fixed
 
         # get current tcp pose (on panda_base frame)            
-        self.current_pose = np.array(current[:3] + [0, 0, 0, 1])       # grip_pos
+        self.current_pose = np.array(position + orientation)           # grip_pos
 
         # get current fingers width
         self.current_gripper = self.gripper.width()                    # gripper_state
@@ -113,7 +113,7 @@ class FrankxEnvironment():
 
         # generate target pose
         self.target_pose = transform(self.current_pose, action[:7])
-        self.target_pose[3:] = [0, 0, 0, 1]
+        # self.target_pose[3:] = [0, 0, 0, 1] #orientation fixed
 
         # generate target gripper
         self.target_gripper = action[7]
