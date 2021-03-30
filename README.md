@@ -33,7 +33,21 @@ This package was tested with real robot with:
 ## **Dependencies and building**
 Follow **Dependencies and building** section [here](https://github.com/Envq/panda_controller) 
 
+### **frankx**
 Install [frankx](https://github.com/pantor/frankx)
+
+Note: To make frankx compatible (which assumes libfranka 0.7.1) with libfranka 0.8.0, go to frankx/src/frankx/robot.cpp and change **setEE** in the setDefaultBehavior() method with:
+~~~
+setEE({1.0, 0.0, 0.0, 0.0,  0.0, -1.0, 0.0, 0.0,  0.0, 0.0, -1.0, 0.0,  0.0, 0.0, 0.0, 1.0});
+~~~
+**Remember** to always call setDefaultBehavior() whenever you use frankx. Example:
+~~~
+
+robot = Robot("192.168.1.2")
+gripper = robot.get_gripper()
+robot.set_default_behavior()
+robot.recover_from_errors()
+~~~
 
 ### **panda_gym**:
 The AI has been trained with the goal closest to the default one... 
