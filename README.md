@@ -71,7 +71,7 @@ catkin build
     - **FILE_NAME:** specify here the name of the file containing the path to be saved
     - **ACTOR:** specify here your actor
 
-![gif_demo](docs/panda_gym_run.gif)
+![gif_panda_gym_run](docs/panda_gym_run.gif)
 
 
 ### **ai_controller**
@@ -118,6 +118,8 @@ catkin build
     - **mode = 1**: the generation of the trajectories is done with the compute_cartesian_path() method of Moveit
     - **mode = 2**: each point is read and immediately executed with moveArmPoseTCP() method of panda_controller
     - **mode2_delay, mode2_delay**: If mode is 2, each point is execute with mode2_delay and with go(wait=mode2_wait) in Moveit
+
+![gif_panda_path_moveit](docs/panda_path_moveit.gif)
 
 
 ### **other**
