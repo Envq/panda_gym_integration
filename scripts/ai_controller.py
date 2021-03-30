@@ -13,7 +13,7 @@ from utils import transform, transform_inverse
 from colors import print_col, colorize
 
 # Custom
-from panda_actors import AiActor, HandEngActor
+from src.panda_actors import AiActor, HandEngActor, E2EActor
 
 
 

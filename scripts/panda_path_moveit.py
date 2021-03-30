@@ -9,9 +9,8 @@ from rospy.rostime import Duration
 import sys
 import os
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../panda_controller/scripts/src")))
-
 # panda_controller
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../panda_controller/scripts/src")))
 from panda_interface_moveit import PandaInterfaceMoveit
 
 

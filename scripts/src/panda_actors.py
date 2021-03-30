@@ -9,13 +9,14 @@ import time
 import sys, os
 
 # panda_controller
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../panda_controller/scripts/src")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../panda_controller/scripts/src")))
 from utils import quaternion_multiply, transform
 from colors import print_col, colorize
 
 # Custom
-from src.ai.models import actor
-from src.ai.arguments import get_args
+sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+from ai.models import actor
+from ai.arguments import get_args
 
 
 

@@ -1,7 +1,13 @@
+#!/usr/bin/env python3
+
+# Frankx
 from frankx import LinearMotion, WaypointMotion, Affine, Waypoint, Robot
+
+# Other
 from math import pi
 import time
 import sys, os
+
 
 
 def parseLine(line):

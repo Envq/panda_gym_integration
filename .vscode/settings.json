@@ -9,6 +9,7 @@
     "python.analysis.extraPaths": [
         "${workspaceFolder}/scripts/",
         "${workspaceFolder}/scripts/src",
+        "${workspaceFolder}/scripts/src/ai",
         "${workspaceFolder}/../panda_controller/scripts/",
         "${workspaceFolder}/../panda_controller/scripts/src/",
         "${workspaceFolder}/../../devel/lib/python3/dist-packages",

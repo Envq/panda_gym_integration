@@ -15,7 +15,7 @@ from utils import transform
 from colors import print_col, colorize
 
 # Custom
-from panda_actors import AiActor, HandEngActor, E2EActor
+from src.panda_actors import AiActor, HandEngActor, E2EActor
 
 
 
