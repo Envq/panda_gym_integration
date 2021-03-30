@@ -274,7 +274,7 @@ def main(NUM_EPISODES, LEN_EPISODE, WRITE_ENABLE, FILE_PATH, DEBUG_ENV_ENABLED, 
 
 
 if __name__ == "__main__":
-    """Configure script here..."""
+    # PARAMETERS
     DEBUG_ENV_ENABLED = False
     DEBUG_AI_ENABLED = False
     NUM_EPISODES = 1
