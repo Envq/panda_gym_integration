@@ -11,9 +11,7 @@ import os
 
 # panda_controller
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../panda_controller/scripts/src")))
-from panda_interface_moveit import PandaInterfaceMoveit
-
-
+from panda_interface import PandaInterface
 
 def parseLine(line):
     target = list()
@@ -49,11 +47,9 @@ def main():
 
         # Create panda moveit interface
         print(real_robot)
-        panda = PandaInterfaceMoveit(\
-                            delay=1,\
-                            arm_velocity_factor=arm_speed,\
-                            startup_homing=False,\
-                            real_robot=real_robot)
+        panda = PandaInterface( delay=1,\
+                                arm_velocity_factor=arm_speed,\
+                                real_robot=real_robot)
         
         # Reading file
         FILE_PATH_NAME = os.path.join(os.path.dirname(__file__), "../data/paths/" + file_name + ".txt")
