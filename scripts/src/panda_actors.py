@@ -31,11 +31,11 @@ class AiActor():
         self.phase = 0
         
         self.approach_position_tollerance      = 0.031   # [m]
-        self.approach_orientation_tollerance   = 0.005   # [m]
+        self.approach_orientation_tollerance   = 0.005   # [rad]
         self.manipulate_position_tollerance    = 0.020   # [m]
-        self.manipulate_orientation_tollerance = 0.005   # [m]
+        self.manipulate_orientation_tollerance = 0.005   # [rad]
         self.retract_position_tollerance       = 0.031   # [m]
-        self.retract_orientation_tollerance    = 0.005   # [m]
+        self.retract_orientation_tollerance    = 0.005   # [rad]
 
         # load ai
         self._loadAI()
