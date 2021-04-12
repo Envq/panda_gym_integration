@@ -9,7 +9,7 @@ if __name__ == '__main__':
     robot.recover_from_errors()
 
     # Reduce the acceleration and velocity dynamic
-    robot.set_dynamic_rel(0.05)
+    robot.set_dynamic_rel(0.07)
 
     cmd = sys.argv[1]
 

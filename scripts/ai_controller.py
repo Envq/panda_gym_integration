@@ -50,8 +50,11 @@ class FrankxEnvironment():
 
     def _moveArm(self, pose):
         position = pose[:3]
-        orientation = euler_from_quaternion(pose[3:])
-        #orientation = [0, 0, 0, 1] #orientation fixed
+        orientation = euler_from_quaternion(x = pose[3], \
+                                            y = pose[4], \
+                                            z = pose[5], \
+                                            w = pose[6])
+        orientation = [0, 0, 0] #orientation fixed (0,0,0,1 quaternion)
         pose = Affine(*position, *orientation)
         motion = LinearMotion(pose)
         self.arm.move(motion)
@@ -93,8 +96,10 @@ class FrankxEnvironment():
         # get current pose
         current = self.arm.current_pose().vector().tolist()
         position = current[:3]
-        orientation = quaternion_from_euler(current[3:])
-        #orientation = [0, 0, 0, 1] #orientation fixed
+        orientation = quaternion_from_euler(roll = current[3], \
+                                            pitch = current[4], \
+                                            yaw = current[5]).tolist()
+        orientation = [0, 0, 0, 1] #orientation fixed
 
         # get current tcp pose (on panda_base frame)            
         self.current_pose = np.array(position + orientation)           # grip_pos
@@ -113,7 +118,7 @@ class FrankxEnvironment():
 
         # generate target pose
         self.target_pose = transform(self.current_pose, action[:7])
-        # self.target_pose[3:] = [0, 0, 0, 1] #orientation fixed
+        self.target_pose[3:] = [0, 0, 0, 1] #orientation fixed
 
         # generate target gripper
         self.target_gripper = action[7]
@@ -253,11 +258,11 @@ if __name__ == "__main__":
             [0.4, 0.0, 0.4,  0.0, 0.0, 0.0, 1.0], #run this to see the error
         ]
     OBJ_POSE = [
-            [0.618024652107368, -0.018727033651026792, 0.125,  0.0, 0.0, 0.0, 1.0],
+            [0.618024652107368, -0.018727033651026792, 0.085,  0.0, 0.0, 0.0, 1.0],
             [0.50, 0.0, 0.2,  0.0, 0.0, 0.0, 1.0],
         ]
     GOAL_POSE = [
-            [0.4898394521073681, -0.07501663365102673, 0.2,  0.0, 0.0, 0.0, 1.0],
+            [0.3898394521073681, -0.07501663365102673, 0.2,  0.0, 0.0, 0.0, 1.0],
             [0.40, 0.0, 0.4,  0.0, 0.0, 0.0, 1.0],
         ]
 
