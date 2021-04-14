@@ -85,7 +85,7 @@ catkin build
     - **FILE_NAME:** specify here the name of the file containing the path to be saved
     - **ACTOR:** specify here your actor
 
-![gif_panda_gym_run](docs/panda_gym_run.gif)
+![gif_panda_gym_run](doc/panda_gym_run.gif)
 
 
 ### **ai_controller**
@@ -102,6 +102,10 @@ catkin build
     - **START_POSE**: this is a list of start pose for your episodes. Note**: the AI used requires that the start pose is always the same
     - **OBJ_POSE**: this is a list of object pose for your episodes
     - **GOAL_POSE**: this is a list of goal pose for your episodes
+
+- Note: the accuracy of the AI is in the order of 10 cm.
+
+![gif_panda_gym_run](doc/ai_controller.gif)
 
 
 ### **panda_path**
@@ -133,7 +137,7 @@ catkin build
     - **mode = 2**: each point is read and immediately executed with moveArmPoseTCP() method of panda_controller
     - **mode2_delay, mode2_delay**: If mode is 2, each point is execute with mode2_delay and with go(wait=mode2_wait) in Moveit
 
-![gif_panda_path_moveit](docs/panda_path_moveit.gif)
+![gif_panda_path_moveit](doc/panda_path_moveit.gif)
 
 
 ### **other**
